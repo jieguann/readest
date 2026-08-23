@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LibraryEmptyState from '@/app/library/components/LibraryEmptyState';
 
@@ -29,11 +29,21 @@ vi.mock('@/context/EnvContext', () => ({
   useEnv: () => useEnvMock(),
 }));
 
+const isWebAppPlatformMock = vi.fn();
+vi.mock('@/services/environment', () => ({
+  isWebAppPlatform: () => isWebAppPlatformMock(),
+}));
+
+beforeEach(() => {
+  isWebAppPlatformMock.mockReturnValue(false);
+});
+
 afterEach(() => {
   cleanup();
   useAuthMock.mockReset();
   navigateToLoginMock.mockReset();
   useEnvMock.mockReset();
+  isWebAppPlatformMock.mockReset();
 });
 
 describe('LibraryEmptyState', () => {
@@ -60,6 +70,16 @@ describe('LibraryEmptyState', () => {
   it('hides the sync button when the user is logged in', () => {
     useEnvMock.mockReturnValue({ appService: { isMobile: false } });
     useAuthMock.mockReturnValue({ user: { id: 'stub-user' } });
+    render(<LibraryEmptyState onImport={vi.fn()} />);
+
+    expect(screen.getByRole('button', { name: 'Import Books' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Sign in to sync your library' })).toBeNull();
+  });
+
+  it('hides the Readest account sign-in prompt in the web-only reader', () => {
+    isWebAppPlatformMock.mockReturnValue(true);
+    useEnvMock.mockReturnValue({ appService: { isMobile: false } });
+    useAuthMock.mockReturnValue({ user: null });
     render(<LibraryEmptyState onImport={vi.fn()} />);
 
     expect(screen.getByRole('button', { name: 'Import Books' })).toBeTruthy();

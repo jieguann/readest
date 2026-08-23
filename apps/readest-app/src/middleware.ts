@@ -73,6 +73,9 @@ export function middleware(request: NextRequest) {
   return response;
 }
 
+export default middleware;
+export const proxy = middleware;
+
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.json).*)'],
 };

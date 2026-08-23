@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { MdLink, MdMenuBook, MdRssFeed } from 'react-icons/md';
+import { MdCloudQueue, MdLink, MdMenuBook, MdRssFeed } from 'react-icons/md';
 import { LuLibrary } from 'react-icons/lu';
 import { IoFileTray } from 'react-icons/io5';
 import { useEnv } from '@/context/EnvContext';
@@ -14,6 +14,7 @@ export interface ImportMenuProps {
   onImportBooksFromDirectory?: () => void;
   onImportBookFromUrl?: () => void;
   onImportBookFromNovelUrl?: () => void;
+  onOpenGoogleDriveSource?: () => void;
   onOpenCatalogManager: () => void;
   onOpenFeeds: () => void;
 }
@@ -25,6 +26,7 @@ const ImportMenu: React.FC<ImportMenuProps> = ({
   onImportBooksFromDirectory,
   onImportBookFromUrl,
   onImportBookFromNovelUrl,
+  onOpenGoogleDriveSource,
   onOpenCatalogManager,
   onOpenFeeds,
 }) => {
@@ -53,6 +55,11 @@ const ImportMenu: React.FC<ImportMenuProps> = ({
 
   const handleOpenCatalogManager = () => {
     onOpenCatalogManager();
+    setIsDropdownOpen?.(false);
+  };
+
+  const handleOpenGoogleDriveSource = () => {
+    onOpenGoogleDriveSource?.();
     setIsDropdownOpen?.(false);
   };
 
@@ -93,6 +100,13 @@ const ImportMenu: React.FC<ImportMenuProps> = ({
           label={_('From Web Novel')}
           Icon={<MdMenuBook className='h-5 w-5' />}
           onClick={handleImportFromNovelUrl}
+        />
+      )}
+      {onOpenGoogleDriveSource && (
+        <MenuItem
+          label={_('Google Drive Books')}
+          Icon={<MdCloudQueue className='h-5 w-5' />}
+          onClick={handleOpenGoogleDriveSource}
         />
       )}
       <MenuItem

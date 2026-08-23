@@ -9,13 +9,23 @@ import { AvailablePlan, PlanType } from '@/types/quota';
 
 let stripePromise: Promise<StripeClient | null>;
 
+const decodeBase64Env = (value?: string) => {
+  if (!value) return '';
+  try {
+    return atob(value.trim());
+  } catch {
+    return '';
+  }
+};
+
 export const getStripe = () => {
   if (!stripePromise) {
     const publishableKey =
       process.env.NODE_ENV === 'production'
         ? process.env['NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_BASE64']
         : process.env['NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY_DEV_BASE64'];
-    stripePromise = loadStripe(atob(publishableKey!));
+    const decodedKey = decodeBase64Env(publishableKey);
+    stripePromise = decodedKey ? loadStripe(decodedKey) : Promise.resolve(null);
   }
   return stripePromise;
 };

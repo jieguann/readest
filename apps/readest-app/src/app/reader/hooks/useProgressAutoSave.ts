@@ -5,6 +5,8 @@ import { useReaderStore } from '@/store/readerStore';
 import { useBookProgress } from '@/store/readerProgressStore';
 import { useSettingsStore } from '@/store/settingsStore';
 import { debounce } from '@/utils/debounce';
+import { pushGoogleDriveProgress } from '@/services/googleDriveSource';
+import { useLibraryStore } from '@/store/libraryStore';
 
 export const useProgressAutoSave = (bookKey: string) => {
   const { envConfig } = useEnv();
@@ -32,6 +34,7 @@ export const useProgressAutoSave = (bookKey: string) => {
         if (useReaderStore.getState().getViewState(bookKey)?.previewMode) return;
         const config = getConfig(bookKey);
         if (!config) return;
+        const book = useLibraryStore.getState().getBookByHash(bookKey.split('-')[0]!);
         const currentLocation = config.location ?? null;
         if (!initializedRef.current) {
           initializedRef.current = true;
@@ -40,7 +43,20 @@ export const useProgressAutoSave = (bookKey: string) => {
         }
         if (currentLocation === lastSavedLocationRef.current) return;
         const settings = useSettingsStore.getState().settings;
-        await saveConfig(envConfig, bookKey, config, settings);
+        const configToSave = book?.cloudSource
+          ? { ...config, cloudProgressUpdatedAt: Date.now() }
+          : config;
+        if (configToSave !== config) {
+          useBookDataStore.getState().setConfig(bookKey, {
+            cloudProgressUpdatedAt: configToSave.cloudProgressUpdatedAt,
+          });
+        }
+        await saveConfig(envConfig, bookKey, configToSave, settings);
+        if (book) {
+          await pushGoogleDriveProgress(book, configToSave).catch((error: unknown) => {
+            console.info('Google Drive progress sync will retry later', error);
+          });
+        }
         lastSavedLocationRef.current = currentLocation;
       }, 500);
     }, 1000),

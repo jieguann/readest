@@ -223,7 +223,9 @@
     "zustand": "5.0.10"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "1.37.1",
     "@next/bundle-analyzer": "^15.4.2",
+    "@openai/sites-vite-plugin": "0.2.0",
     "@playwright/test": "^1.60.0",
     "@sentry/cli": "^2.39.1",
     "@tailwindcss/typography": "^0.5.16",

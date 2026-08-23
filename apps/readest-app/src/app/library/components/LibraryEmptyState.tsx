@@ -7,6 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useAppRouter } from '@/hooks/useAppRouter';
 import { navigateToLogin } from '@/utils/nav';
+import { isWebAppPlatform } from '@/services/environment';
 
 interface LibraryEmptyStateProps {
   onImport: (anchor: HTMLElement) => void;
@@ -42,7 +43,7 @@ const LibraryEmptyState: React.FC<LibraryEmptyStateProps> = ({ onImport }) => {
           </button>
           {/* TODO: add a 'Browse free catalogs' secondary action that opens the
               OPDS dialog (handleShowOPDSDialog) once we settle on placement. */}
-          {!user && (
+          {!user && !isWebAppPlatform() && (
             <button
               type='button'
               className={clsx(

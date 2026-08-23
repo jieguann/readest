@@ -19,14 +19,24 @@ const shouldOptOutAtBoot = () => {
   return localStorage.getItem(TELEMETRY_OPT_OUT_KEY) !== 'false';
 };
 
+const decodeBase64Env = (value?: string) => {
+  if (!value) return '';
+  try {
+    return atob(value.trim());
+  } catch {
+    return '';
+  }
+};
+
 const posthogUrl =
   process.env['NEXT_PUBLIC_POSTHOG_HOST'] ||
-  atob(process.env['NEXT_PUBLIC_DEFAULT_POSTHOG_URL_BASE64']!);
+  decodeBase64Env(process.env['NEXT_PUBLIC_DEFAULT_POSTHOG_URL_BASE64']);
 const posthogKey =
   process.env['NEXT_PUBLIC_POSTHOG_KEY'] ||
-  atob(process.env['NEXT_PUBLIC_DEFAULT_POSTHOG_KEY_BASE64']!);
+  decodeBase64Env(process.env['NEXT_PUBLIC_DEFAULT_POSTHOG_KEY_BASE64']);
+const posthogEnabled = Boolean(posthogKey && posthogUrl);
 
-if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'production' && posthogKey) {
+if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'production' && posthogEnabled) {
   posthog.init(posthogKey, {
     api_host: posthogUrl,
     person_profiles: 'always',
@@ -36,9 +46,12 @@ if (typeof window !== 'undefined' && process.env['NODE_ENV'] === 'production' &&
 }
 export const CSPostHogProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
-    posthog.register_for_session({
-      $app_version: getAppVersion(),
-    });
+    if (posthogEnabled) {
+      posthog.register_for_session({
+        $app_version: getAppVersion(),
+      });
+    }
   }, []);
+  if (!posthogEnabled) return children;
   return <PostHogProvider client={posthog}>{children}</PostHogProvider>;
 };

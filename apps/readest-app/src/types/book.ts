@@ -88,6 +88,9 @@ export interface ImportBookOptions {
 export interface Book {
   // if Book is a remote book we just lazy load the book content via url
   url?: string;
+  // A remote catalog entry that supplied this local copy. Removing the local
+  // book does not remove the source file; it can be downloaded again later.
+  cloudSource?: import('@/services/googleDriveSource').GoogleDriveCloudSource;
   // if Book is a transient local book we can load the book content via filePath
   filePath?: string;
   // Other on-disk paths that resolved to this same book — a watched folder
@@ -570,6 +573,9 @@ export interface BookConfig {
   metaHash?: string;
   progress?: [number, number]; // [current pagenum, total pagenum], 1-based page number
   location?: string; // CFI of the current location
+  // Last cloud-catalog progress revision applied locally. Kept separate from
+  // updatedAt so a metadata/note edit cannot hide a newer reading position.
+  cloudProgressUpdatedAt?: number;
   xpointer?: string; // XPointer of the current location (for Koreader interoperability)
   booknotes?: BookNote[];
   rsvpPosition?: { cfi: string; wordText: string };

@@ -1,4 +1,4 @@
-import init, { cut } from 'jieba-wasm';
+import init, { cut } from 'jieba-wasm/web';
 
 let initialized = false;
 let initPromise: Promise<void> | null = null;

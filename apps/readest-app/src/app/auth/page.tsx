@@ -71,12 +71,6 @@ export default function AuthPage() {
     return `http://localhost:${port}`;
   };
 
-  const getWebRedirectTo = () => {
-    return process.env.NODE_ENV === 'production'
-      ? WEB_AUTH_CALLBACK
-      : `${window.location.origin}/auth/callback`;
-  };
-
   const tauriSignInApple = async () => {
     if (!supabase) {
       throw new Error('No backend connected');
@@ -141,19 +135,6 @@ export default function AuthPage() {
       return tauriSignInApple();
     }
     return tauriSignIn(provider);
-  };
-
-  const webProviderSignIn = async (provider: OAuthProvider) => {
-    if (!supabase) {
-      throw new Error('No backend connected');
-    }
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: getWebRedirectTo() },
-    });
-    if (error) {
-      console.error('Authentication error:', error);
-    }
   };
 
   const handleOAuthUrl = async (url: string) => {
@@ -284,14 +265,22 @@ export default function AuthPage() {
     setIsMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (!isTauriAppPlatform()) router.replace('/library');
+  }, [router]);
+
   if (!isMounted) {
+    return null;
+  }
+
+  if (!isTauriAppPlatform()) {
     return null;
   }
 
   // For tauri app development, use a custom OAuth server to handle the OAuth callback
   // For tauri app production, use deeplink to handle the OAuth callback
   // For web app, use the built-in OAuth callback page /auth/callback
-  return isTauriAppPlatform() ? (
+  return (
     <div
       className={clsx(
         'bg-base-100 full-height inset-0 flex select-none flex-col items-center overflow-hidden',
@@ -344,22 +333,6 @@ export default function AuthPage() {
           />
         </div>
       </div>
-    </div>
-  ) : (
-    <div className='bg-base-100 flex min-h-screen flex-col items-center overflow-y-auto px-6 pb-12 pt-20'>
-      <button
-        aria-label={_('Go Back')}
-        onClick={handleGoBack}
-        className='btn btn-ghost fixed start-6 top-6 h-8 min-h-8 w-8 p-0'
-      >
-        <IoArrowBack className='text-base-content' />
-      </button>
-      <AuthPanel
-        supabaseClient={supabase}
-        magicLink={true}
-        redirectTo={getWebRedirectTo()}
-        onProviderSignIn={webProviderSignIn}
-      />
     </div>
   );
 }

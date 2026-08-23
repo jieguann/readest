@@ -1,4 +1,7 @@
-import nunjucks from 'nunjucks';
+// Use Nunjucks' browser bundle so the hosted worker never pulls in its
+// filesystem-based precompiler.
+// @ts-expect-error The browser bundle does not publish a separate declaration file.
+import nunjucks from 'nunjucks/browser/nunjucks.js';
 
 export type NoteTemplateData = {
   title: string;

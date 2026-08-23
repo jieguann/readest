@@ -43,6 +43,7 @@ import LocalSendManager from '@/components/localsend/LocalSendManager';
 import BooksGrid from './BooksGrid';
 import SettingsDialog from '@/components/settings/SettingsDialog';
 import AudiobookPairingDialog from './audiobook/AudiobookPairingDialog';
+import { pullGoogleDriveProgress, pushGoogleDriveProgress } from '@/services/googleDriveSource';
 
 const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ ids, settings }) => {
   const _ = useTranslation();
@@ -52,7 +53,7 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
   const { bookKeys, dismissBook, getNextBookKey } = useBooksManager();
   const { sideBarBookKey, setSideBarBookKey } = useSidebarStore();
   const { saveSettings } = useSettingsStore();
-  const { getConfig, getBookData, saveConfig } = useBookDataStore();
+  const { getConfig, getBookData, saveConfig, setConfig } = useBookDataStore();
   const { getView, setBookKeys, getViewSettings } = useReaderStore();
   const { initViewState, getViewState, clearViewState } = useReaderStore();
   const { isSettingsDialogOpen, settingsDialogBookKey } = useSettingsStore();
@@ -109,7 +110,16 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
       const isPrimary = !uniqueIds.has(id);
       uniqueIds.add(id);
       if (!getViewState(key)) {
-        initViewState(envConfig, id, key, isPrimary).catch((error) => {
+        const initializeBook = async () => {
+          const book = getBookByHash(id);
+          if (book?.cloudSource) {
+            await pullGoogleDriveProgress(envConfig, book).catch((error: unknown) => {
+              console.info('Could not pull Google Drive reading position', error);
+            });
+          }
+          await initViewState(envConfig, id, key, isPrimary);
+        };
+        initializeBook().catch((error) => {
           console.log('Error initializing book', key, error);
           setErrorLoading(true);
           eventDispatcher.dispatch('toast', {
@@ -211,7 +221,16 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
       const settings = useSettingsStore.getState().settings;
       eventDispatcher.dispatch('sync-book-progress', { bookKey });
       eventDispatcher.dispatch('flush-kosync', { bookKey });
-      await saveConfig(envConfig, bookKey, config, settings);
+      const configToSave = book.cloudSource
+        ? { ...config, cloudProgressUpdatedAt: Date.now() }
+        : config;
+      if (configToSave !== config) {
+        setConfig(bookKey, { cloudProgressUpdatedAt: configToSave.cloudProgressUpdatedAt });
+      }
+      await saveConfig(envConfig, bookKey, configToSave, settings);
+      await pushGoogleDriveProgress(book, configToSave).catch((error: unknown) => {
+        console.info('Google Drive progress sync will retry later', error);
+      });
     }
   };
 

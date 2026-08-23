@@ -381,9 +381,9 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
             <MenuItem label={_('Account')} onClick={handleUserProfile} />
           </ul>
         </MenuItem>
-      ) : (
+      ) : !isWebAppPlatform() ? (
         <MenuItem label={_('Sign In')} Icon={PiUserCircle} onClick={handleUserLogin}></MenuItem>
-      )}
+      ) : null}
 
       {isTauriAppPlatform() && (
         <MenuItem

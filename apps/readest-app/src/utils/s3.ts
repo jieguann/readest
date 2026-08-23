@@ -21,32 +21,22 @@ const s3ClientCredentials = {
   secretAccessKey: S3_SECRET_ACCESS_KEY,
 };
 
-// Internal client used for server-side SDK calls (PutObject, CopyObject, etc.)
-export const s3Client = new S3Client({
-  forcePathStyle: true,
-  region: S3_REGION,
-  endpoint: S3_ENDPOINT,
-  credentials: s3ClientCredentials,
-});
+const createS3Client = (endpoint: string) =>
+  new S3Client({
+    forcePathStyle: true,
+    region: S3_REGION,
+    endpoint,
+    credentials: s3ClientCredentials,
+  });
 
-// Signing client uses S3_PUBLIC_ENDPOINT so presigned URLs contain a hostname
-// that browsers can reach (S3_ENDPOINT may be an internal docker hostname like
-// "minio:9000" which is not resolvable outside the docker network).
-const s3SigningClient = new S3Client({
-  forcePathStyle: true,
-  region: S3_REGION,
-  endpoint: S3_PUBLIC_ENDPOINT,
-  credentials: s3ClientCredentials,
-});
+// Create SDK clients only when an S3 operation is requested. The web reader
+// does not use S3 during page rendering, and eager construction pulls
+// Node-only credential loaders into the hosted worker startup path.
+const getSigningClient = () => createS3Client(S3_PUBLIC_ENDPOINT);
 
 export const s3Storage = {
   getClient: () => {
-    return new S3Client({
-      forcePathStyle: true,
-      region: S3_REGION,
-      endpoint: S3_ENDPOINT,
-      credentials: s3ClientCredentials,
-    });
+    return createS3Client(S3_ENDPOINT);
   },
 
   getDownloadSignedUrl: async (bucketName: string, fileKey: string, expiresIn: number) => {
@@ -54,7 +44,7 @@ export const s3Storage = {
       Bucket: bucketName,
       Key: fileKey,
     });
-    const downloadUrl = await getSignedUrl(s3SigningClient, getCommand, {
+    const downloadUrl = await getSignedUrl(getSigningClient(), getCommand, {
       expiresIn: expiresIn,
     });
     return downloadUrl;
@@ -74,7 +64,7 @@ export const s3Storage = {
       ContentLength: contentLength,
     });
 
-    const uploadUrl = await getSignedUrl(s3SigningClient, putCommand, {
+    const uploadUrl = await getSignedUrl(getSigningClient(), putCommand, {
       expiresIn: expiresIn,
       signableHeaders,
     });

@@ -113,6 +113,7 @@ import LibraryHeader from './components/LibraryHeader';
 import Bookshelf from './components/Bookshelf';
 import LibraryEmptyState from './components/LibraryEmptyState';
 import ImportMenuPopup from './components/ImportMenuPopup';
+import GoogleDriveSourceDialog from './components/GoogleDriveSourceDialog';
 import GroupHeader from './components/GroupHeader';
 import FailedImportsDialog, { FailedImport } from './components/FailedImportsDialog';
 import ImportFromFolderDialog, {
@@ -256,6 +257,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   const [showAddFeed, setShowAddFeed] = useState(false);
   const [showImportFromUrl, setShowImportFromUrl] = useState(false);
   const [showImportNovel, setShowImportNovel] = useState(false);
+  const [showGoogleDriveSource, setShowGoogleDriveSource] = useState(false);
   const [importMenuAnchor, setImportMenuAnchor] = useState<HTMLElement | null>(null);
   const [loading, setLoading] = useState(false);
   // Seed from the library store: if we already have books in memory (the
@@ -435,6 +437,10 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     const snapshot = searchParams?.toString() || '';
     if (snapshot !== new URLSearchParams(window.location.search).toString()) return;
     sessionStorage.setItem('lastLibraryParams', snapshot);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (searchParams?.get('drive')) setShowGoogleDriveSource(true);
   }, [searchParams]);
 
   // Strip the empty `group=` param that `handleLibraryNavigation` sets as a
@@ -726,7 +732,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           setSettings(settings);
           saveSettings(envConfig, settings);
         }
-      } else if (settings.keepLogin) {
+      } else if (settings.keepLogin && isTauriAppPlatform()) {
         router.push('/auth');
       }
     };
@@ -994,6 +1000,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           { appService, settings: liveSettings, isLoggedIn: !!user, appBooksPrefix },
         );
         if (!book) return null;
+        if (selectedFile.cloudSource) book.cloudSource = selectedFile.cloudSource;
         successfulImports.push(book.title);
         return book;
       } catch (error) {
@@ -1323,6 +1330,11 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       if (result.files.length === 0 || result.error) return;
       importBooks(result.files, getImportTargetGroupId());
     });
+  };
+
+  const handleImportGoogleDriveFiles = async (files: SelectedFile[]) => {
+    setIsSelectMode(false);
+    await importBooks(files, getImportTargetGroupId());
   };
 
   useAndroidPickedBooks(appService, (files) => {
@@ -1937,6 +1949,9 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           onImportBookFromNovelUrl={
             isTauriAppPlatform() ? () => setShowImportNovel(true) : undefined
           }
+          onOpenGoogleDriveSource={
+            isWebAppPlatform() ? () => setShowGoogleDriveSource(true) : undefined
+          }
           onOpenCatalogManager={handleShowOPDSDialog}
           onOpenFeeds={handleShowFeeds}
           onToggleSelectMode={() => handleSetSelectMode(!isSelectMode)}
@@ -2104,6 +2119,9 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           onImportBookFromNovelUrl={
             isTauriAppPlatform() ? () => setShowImportNovel(true) : undefined
           }
+          onOpenGoogleDriveSource={
+            isWebAppPlatform() ? () => setShowGoogleDriveSource(true) : undefined
+          }
           onOpenCatalogManager={handleShowOPDSDialog}
           onOpenFeeds={handleShowFeeds}
         />
@@ -2144,6 +2162,11 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       {isSettingsDialogOpen && <SettingsDialog bookKey={''} />}
       {showCatalogManager && <CatalogDialog onClose={handleDismissOPDSDialog} />}
       {showFeeds && <FeedsView onClose={() => setShowFeeds(false)} />}
+      <GoogleDriveSourceDialog
+        isOpen={showGoogleDriveSource}
+        onClose={() => setShowGoogleDriveSource(false)}
+        onImport={handleImportGoogleDriveFiles}
+      />
       <AddFeedModal
         isOpen={showAddFeed}
         onClose={() => setShowAddFeed(false)}

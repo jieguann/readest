@@ -6,6 +6,7 @@ import { isContentURI, isFileURI, stubTranslation as _ } from '@/utils/misc';
 import { getFilename } from '@/utils/path';
 import { eventDispatcher } from '@/utils/event';
 import { BOOK_ACCEPT_FORMATS, SUPPORTED_BOOK_EXTS } from '@/services/constants';
+import type { GoogleDriveCloudSource } from '@/services/googleDriveSource';
 
 export interface FileSelectorOptions {
   type: SelectionType;
@@ -30,6 +31,7 @@ export interface SelectedFile {
   // classify by extension (dictionary bundle grouping) must use this, not a
   // naive parse of `path`. See #4489.
   name?: string;
+  cloudSource?: GoogleDriveCloudSource;
 }
 
 export interface FileSelectionResult {
