@@ -7,7 +7,6 @@ import { TbSunMoon } from 'react-icons/tb';
 import { MdCloudSync, MdSync, MdSyncProblem, MdOutlineSensors } from 'react-icons/md';
 
 import { isTauriAppPlatform, isWebAppPlatform } from '@/services/environment';
-import { DOWNLOAD_READEST_URL } from '@/services/constants';
 import { setBackupDialogVisible } from '@/app/library/components/BackupWindow';
 import { setCacheManagerDialogVisible } from '@/app/library/components/CacheManagerWindow';
 import { useAuth } from '@/context/AuthContext';
@@ -113,11 +112,6 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
 
   const showAboutReadest = () => {
     setAboutDialogVisible(true);
-    setIsDropdownOpen?.(false);
-  };
-
-  const downloadReadest = () => {
-    window.open(DOWNLOAD_READEST_URL, '_blank');
     setIsDropdownOpen?.(false);
   };
 
@@ -432,64 +426,67 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ onPullLibrary, setIsDropdow
         onClick={cycleThemeMode}
       />
       <MenuItem label={_('Settings')} Icon={PiGear} onClick={openSettingsDialog} />
-      <hr aria-hidden='true' className='border-base-200 my-1' />
-      <MenuItem label={_('Advanced Settings')}>
-        <ul className='ms-0 flex flex-col ps-0 before:hidden'>
-          <MenuItem label={_('Backup & Restore')} onClick={handleBackupRestore} />
-          {appService?.canCustomizeRootDir && (
-            <MenuItem label={_('Change Data Location')} onClick={handleSetRootDir} />
+      {!isWebAppPlatform() && (
+        <>
+          <hr aria-hidden='true' className='border-base-200 my-1' />
+          <MenuItem label={_('Advanced Settings')}>
+            <ul className='ms-0 flex flex-col ps-0 before:hidden'>
+              <MenuItem label={_('Backup & Restore')} onClick={handleBackupRestore} />
+              {appService?.canCustomizeRootDir && (
+                <MenuItem label={_('Change Data Location')} onClick={handleSetRootDir} />
+              )}
+              {user && <MenuItem label={_('Data Sync')} onClick={handleManageSync} />}
+              <MenuItem
+                label={_('Refresh Metadata')}
+                description={refreshMetadataProgress}
+                onClick={handleRefreshMetadata}
+                disabled={isRefreshingMetadata}
+              />
+              {appService?.isMobileApp && (
+                <MenuItem label={_('Manage Cache')} onClick={handleManageCache} />
+              )}
+              {!isPinEnabled && (
+                <MenuItem
+                  label={_('Set PIN…')}
+                  tooltip={
+                    appService?.isMobileApp
+                      ? _('Require a PIN (and biometrics, if available) to open Readest')
+                      : _('Require a 4-digit PIN to open Readest')
+                  }
+                  onClick={() => openAppLockDialog('set')}
+                />
+              )}
+              {isPinEnabled && (
+                <MenuItem label={_('Change PIN…')} onClick={() => openAppLockDialog('change')} />
+              )}
+              {isPinEnabled && (
+                <MenuItem label={_('Disable PIN…')} onClick={() => openAppLockDialog('disable')} />
+              )}
+              {showBiometricToggle && (
+                <MenuItem
+                  label={_('Unlock with {{biometry}}', { biometry: _(biometryLabelKey) })}
+                  toggled={!!settings.biometricUnlockEnabled}
+                  onClick={toggleBiometricUnlock}
+                />
+              )}
+              {appService?.isAndroidApp && (
+                <MenuItem
+                  label={_('Save Book Cover')}
+                  tooltip={_('Auto-save last book cover')}
+                  description={savedBookCoverForLockScreen ? savedBookCoverDescription : ''}
+                  toggled={!!savedBookCoverForLockScreen}
+                  onClick={handleSetSavedBookCoverForLockScreen}
+                />
+              )}
+            </ul>
+          </MenuItem>
+          <hr aria-hidden='true' className='border-base-200 my-1' />
+          {user && userProfilePlan === 'free' && (
+            <MenuItem label={_('Upgrade to Readest Premium')} onClick={handleUpgrade} />
           )}
-          {user && <MenuItem label={_('Data Sync')} onClick={handleManageSync} />}
-          <MenuItem
-            label={_('Refresh Metadata')}
-            description={refreshMetadataProgress}
-            onClick={handleRefreshMetadata}
-            disabled={isRefreshingMetadata}
-          />
-          {appService?.isMobileApp && (
-            <MenuItem label={_('Manage Cache')} onClick={handleManageCache} />
-          )}
-          {!isPinEnabled && (
-            <MenuItem
-              label={_('Set PIN…')}
-              tooltip={
-                appService?.isMobileApp
-                  ? _('Require a PIN (and biometrics, if available) to open Readest')
-                  : _('Require a 4-digit PIN to open Readest')
-              }
-              onClick={() => openAppLockDialog('set')}
-            />
-          )}
-          {isPinEnabled && (
-            <MenuItem label={_('Change PIN…')} onClick={() => openAppLockDialog('change')} />
-          )}
-          {isPinEnabled && (
-            <MenuItem label={_('Disable PIN…')} onClick={() => openAppLockDialog('disable')} />
-          )}
-          {showBiometricToggle && (
-            <MenuItem
-              label={_('Unlock with {{biometry}}', { biometry: _(biometryLabelKey) })}
-              toggled={!!settings.biometricUnlockEnabled}
-              onClick={toggleBiometricUnlock}
-            />
-          )}
-          {appService?.isAndroidApp && (
-            <MenuItem
-              label={_('Save Book Cover')}
-              tooltip={_('Auto-save last book cover')}
-              description={savedBookCoverForLockScreen ? savedBookCoverDescription : ''}
-              toggled={!!savedBookCoverForLockScreen}
-              onClick={handleSetSavedBookCoverForLockScreen}
-            />
-          )}
-        </ul>
-      </MenuItem>
-      <hr aria-hidden='true' className='border-base-200 my-1' />
-      {user && userProfilePlan === 'free' && (
-        <MenuItem label={_('Upgrade to Readest Premium')} onClick={handleUpgrade} />
+          <MenuItem label={_('About Readest')} onClick={showAboutReadest} />
+        </>
       )}
-      {isWebAppPlatform() && <MenuItem label={_('Download Readest')} onClick={downloadReadest} />}
-      <MenuItem label={_('About Readest')} onClick={showAboutReadest} />
     </Menu>
   );
 };

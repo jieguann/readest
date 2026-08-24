@@ -130,6 +130,7 @@ import DropIndicator from '@/components/DropIndicator';
 import SettingsDialog from '@/components/settings/SettingsDialog';
 import ModalPortal from '@/components/ModalPortal';
 import TransferQueuePanel from './components/TransferQueuePanel';
+import { shouldShowReadestCloudOnlyDelete } from './utils/deleteOptions';
 import {
   buildGoogleDriveConnectUrl,
   deleteGoogleDriveBook,
@@ -2195,7 +2196,12 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           // removing just its cloud copy is not expressible: the next sync would
           // upload the still-local book straight back (#5084).
           handleBookDeleteCloudBackup={
-            isReadestCloudStorageActive(settings) ? handleBookDelete('cloud') : undefined
+            shouldShowReadestCloudOnlyDelete(
+              isFixedDriveWebReader,
+              isReadestCloudStorageActive(settings),
+            )
+              ? handleBookDelete('cloud')
+              : undefined
           }
           handleBookDeleteLocalCopy={handleBookDelete('local')}
           handleBookPurge={handleBookDelete('purge')}
