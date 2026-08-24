@@ -62,6 +62,12 @@ let ttsPositionSequence = 0;
 // instead of silently racing to the end of the book. See #4613, #4408.
 const TTS_NATIVE_SPEAK_MAX_CONSECUTIVE_ERRORS = 5;
 
+// The hosted reader deliberately uses the browser's built-in speech engine.
+// Edge's remote WebSocket service is not reliable in a normal Chrome tab and
+// can fail only after playback starts, leaving Chrome Web Speech no chance to
+// take over. Native apps keep their existing engine selection and fallbacks.
+const isBrowserSpeechOnly = () => process.env['NEXT_PUBLIC_APP_PLATFORM'] === 'web';
+
 type TTSState =
   | 'stopped'
   | 'playing'
@@ -378,7 +384,8 @@ export class TTSController extends EventTarget {
 
   async init() {
     const availableClients = [];
-    if (await this.ttsEdgeClient.init()) {
+    const browserSpeechOnly = isBrowserSpeechOnly();
+    if (!browserSpeechOnly && (await this.ttsEdgeClient.init())) {
       availableClients.push(this.ttsEdgeClient);
     }
     if (this.ttsNativeClient && (await this.ttsNativeClient.init())) {
@@ -399,7 +406,7 @@ export class TTSController extends EventTarget {
       }
     }
     this.ttsWebVoices = await this.ttsWebClient.getAllVoices();
-    this.ttsEdgeVoices = await this.ttsEdgeClient.getAllVoices();
+    this.ttsEdgeVoices = browserSpeechOnly ? [] : await this.ttsEdgeClient.getAllVoices();
 
     // A book that ships its own narration should be read by its narrator, not
     // synthesized — that is the whole point of having the recording. The
@@ -1493,7 +1500,7 @@ export class TTSController extends EventTarget {
 
   async getVoices(lang: string) {
     const ttsWebVoices = await this.ttsWebClient.getVoices(lang);
-    const ttsEdgeVoices = await this.ttsEdgeClient.getVoices(lang);
+    const ttsEdgeVoices = isBrowserSpeechOnly() ? [] : await this.ttsEdgeClient.getVoices(lang);
     const ttsNativeVoices = (await this.ttsNativeClient?.getVoices(lang)) ?? [];
     // The book's own narrator leads the list when there is one: it is the best
     // voice available for that book by a wide margin.

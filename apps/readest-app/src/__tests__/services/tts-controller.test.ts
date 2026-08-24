@@ -217,6 +217,7 @@ describe('TTSController', () => {
     // Flush the deferred set-state dispatch microtasks while the jsdom realm
     // is still alive.
     await new Promise((resolve) => setTimeout(resolve, 0));
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -285,6 +286,19 @@ describe('TTSController', () => {
   });
 
   describe('init', () => {
+    test('uses only Chrome Web Speech on the web app', async () => {
+      vi.stubEnv('NEXT_PUBLIC_APP_PLATFORM', 'web');
+
+      await controller.init();
+      await controller.getVoices('zh-CN');
+
+      expect(controller.ttsWebClient.init).toHaveBeenCalled();
+      expect(controller.ttsEdgeClient.init).not.toHaveBeenCalled();
+      expect(controller.ttsEdgeClient.getAllVoices).not.toHaveBeenCalled();
+      expect(controller.ttsEdgeClient.getVoices).not.toHaveBeenCalled();
+      expect(controller.ttsClient).toBe(controller.ttsWebClient);
+    });
+
     test('initialises edge and web clients', async () => {
       await controller.init();
 
