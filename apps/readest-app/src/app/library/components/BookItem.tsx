@@ -20,6 +20,7 @@ import { navigateToLogin } from '@/utils/nav';
 import { isReadestCloudStorageActive } from '@/services/sync/cloudSyncProvider';
 import { isFeedBook } from '@/services/rss/feedBookUrl';
 import { isAudiobook } from '@/utils/audiobook';
+import { needsGoogleDriveDownload } from '@/services/googleDriveSource';
 import { formatAuthors, formatDescription, formatSeries } from '@/utils/book';
 import { formatCompactTime } from '@/utils/time';
 import { INDETERMINATE_PROGRESS } from '@/utils/transfer';
@@ -57,6 +58,7 @@ const BookItem: React.FC<BookItemProps> = ({
   const { appService } = useEnv();
   const { settings } = useSettingsStore();
   const iconSize15 = useResponsiveSize(15);
+  const driveDownload = needsGoogleDriveDownload(book);
 
   const [coverAspect, setCoverAspect] = useState<number | null>(null);
   useEffect(() => {
@@ -256,12 +258,18 @@ const BookItem: React.FC<BookItemProps> = ({
                 // would render forever and Upload would always fail.
                 !isFeedBook(book) &&
                 !isAudiobook(book) &&
-                (!book.uploadedAt || (book.uploadedAt && !book.downloadedAt)) && (
+                (driveDownload || !book.uploadedAt || (book.uploadedAt && !book.downloadedAt)) && (
                   <button
-                    aria-label={!book.uploadedAt ? _('Upload Book') : _('Download Book')}
+                    aria-label={
+                      driveDownload || book.uploadedAt ? _('Download Book') : _('Upload Book')
+                    }
                     className='show-cloud-button -m-2 p-2'
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => {
+                      if (driveDownload) {
+                        handleBookDownload(book, { queued: true });
+                        return;
+                      }
                       if (!user) {
                         navigateToLogin(router);
                         return;
@@ -273,10 +281,12 @@ const BookItem: React.FC<BookItemProps> = ({
                       }
                     }}
                   >
-                    {!book.uploadedAt && isReadestCloudStorageActive(settings) && (
-                      <LiaCloudUploadAltSolid size={iconSize15} />
-                    )}
-                    {book.uploadedAt && !book.downloadedAt && (
+                    {!driveDownload &&
+                      !book.uploadedAt &&
+                      isReadestCloudStorageActive(settings) && (
+                        <LiaCloudUploadAltSolid size={iconSize15} />
+                      )}
+                    {(driveDownload || (book.uploadedAt && !book.downloadedAt)) && (
                       <LiaCloudDownloadAltSolid size={iconSize15} />
                     )}
                   </button>

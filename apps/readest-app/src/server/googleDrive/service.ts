@@ -211,11 +211,11 @@ export const driveMediaUrl = (fileId: string): string =>
 export const getConfiguredFolder = (
   session: DriveSessionRecord,
 ): { id: string; url: string; name: string } => {
-  const id = session.folder_id ?? parseGoogleDriveFolderId(DEFAULT_GOOGLE_DRIVE_FOLDER_URL);
+  const id = parseGoogleDriveFolderId(DEFAULT_GOOGLE_DRIVE_FOLDER_URL);
   if (!id) throw new Error('Google Drive folder is not configured');
   return {
     id,
-    url: session.folder_url ?? DEFAULT_GOOGLE_DRIVE_FOLDER_URL,
-    name: session.folder_name ?? 'Readest Books',
+    url: DEFAULT_GOOGLE_DRIVE_FOLDER_URL,
+    name: session.folder_id === id ? (session.folder_name ?? 'Readest Books') : 'Readest Books',
   };
 };

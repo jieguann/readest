@@ -106,6 +106,21 @@ describe('getBookContextMenuItemIds', () => {
     ]);
   });
 
+  it('offers Download for a Google Drive catalog book without opening a catalog window', () => {
+    const book = createBook({
+      url: 'https://reader.example/api/google-drive/books/file-1',
+      cloudSource: {
+        provider: 'google-drive',
+        fileId: 'file-1',
+        folderId: 'folder-1',
+        name: 'Cloud Book.epub',
+      },
+    });
+
+    expect(getBookContextMenuItemIds(book)).toContain('download');
+    expect(getBookContextMenuItemIds(book)).not.toContain('upload');
+  });
+
   it('omits download/upload/share for a book that is neither downloaded nor uploaded', () => {
     const book = createBook({ filePath: '/some/external/file.epub' });
     expect(getBookContextMenuItemIds(book)).toEqual([

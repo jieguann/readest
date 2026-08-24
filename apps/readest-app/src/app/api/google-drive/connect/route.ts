@@ -1,5 +1,5 @@
 import { createPkceChallenge, randomToken } from '@/server/googleDrive/crypto';
-import { parseGoogleDriveFolderId } from '@/services/googleDriveSource';
+import { DEFAULT_GOOGLE_DRIVE_FOLDER_URL } from '@/services/googleDriveSource';
 import {
   DRIVE_OAUTH_STATE_COOKIE,
   DRIVE_OAUTH_VERIFIER_COOKIE,
@@ -15,10 +15,6 @@ export async function GET(request: Request): Promise<Response> {
     const { clientId, redirectUri: configuredRedirectUri } = getGoogleDriveCredentials();
     const requestUrl = new URL(request.url);
     const origin = requestUrl.origin;
-    const folderUrl = requestUrl.searchParams.get('folderUrl')?.trim() ?? '';
-    if (!parseGoogleDriveFolderId(folderUrl)) {
-      return Response.json({ error: 'Paste a valid Google Drive folder link' }, { status: 400 });
-    }
     const redirectUri = configuredRedirectUri || `${origin}/api/google-drive/callback`;
     const state = randomToken();
     const verifier = randomToken(48);
@@ -41,7 +37,10 @@ export async function GET(request: Request): Promise<Response> {
     const headers = new Headers({ Location: authorizationUrl.toString() });
     headers.append('Set-Cookie', secureCookie(DRIVE_OAUTH_STATE_COOKIE, state, 600));
     headers.append('Set-Cookie', secureCookie(DRIVE_OAUTH_VERIFIER_COOKIE, verifier, 600));
-    headers.append('Set-Cookie', secureCookie(DRIVE_PENDING_FOLDER_COOKIE, folderUrl, 600));
+    headers.append(
+      'Set-Cookie',
+      secureCookie(DRIVE_PENDING_FOLDER_COOKIE, DEFAULT_GOOGLE_DRIVE_FOLDER_URL, 600),
+    );
     return new Response(null, { status: 302, headers });
   } catch (error) {
     return Response.json(

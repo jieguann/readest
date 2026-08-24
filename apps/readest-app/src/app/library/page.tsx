@@ -50,8 +50,8 @@ import { useResponsiveSize } from '@/hooks/useResponsiveSize';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useTheme } from '@/hooks/useTheme';
 import { useUICSS } from '@/hooks/useUICSS';
-import { useDemoBooks } from './hooks/useDemoBooks';
 import { useBooksSync } from './hooks/useBooksSync';
+import { useGoogleDriveLibrary } from './hooks/useGoogleDriveLibrary';
 import { useLibraryFileSync } from './hooks/useLibraryFileSync';
 import { useBookTransferActions } from './hooks/useBookTransferActions';
 import { useAutoImportFolders } from './hooks/useAutoImportFolders';
@@ -113,7 +113,6 @@ import LibraryHeader from './components/LibraryHeader';
 import Bookshelf from './components/Bookshelf';
 import LibraryEmptyState from './components/LibraryEmptyState';
 import ImportMenuPopup from './components/ImportMenuPopup';
-import GoogleDriveSourceDialog from './components/GoogleDriveSourceDialog';
 import GroupHeader from './components/GroupHeader';
 import FailedImportsDialog, { FailedImport } from './components/FailedImportsDialog';
 import ImportFromFolderDialog, {
@@ -131,6 +130,10 @@ import DropIndicator from '@/components/DropIndicator';
 import SettingsDialog from '@/components/settings/SettingsDialog';
 import ModalPortal from '@/components/ModalPortal';
 import TransferQueuePanel from './components/TransferQueuePanel';
+import {
+  downloadGoogleDriveLibraryBook,
+  needsGoogleDriveDownload,
+} from '@/services/googleDriveSource';
 
 /** Skip tiny non-book artifacts during folder auto-scan (matches the manual import dialog default). */
 const AUTO_IMPORT_MIN_SIZE_BYTES = 20 * 1024;
@@ -257,7 +260,6 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   const [showAddFeed, setShowAddFeed] = useState(false);
   const [showImportFromUrl, setShowImportFromUrl] = useState(false);
   const [showImportNovel, setShowImportNovel] = useState(false);
-  const [showGoogleDriveSource, setShowGoogleDriveSource] = useState(false);
   const [importMenuAnchor, setImportMenuAnchor] = useState<HTMLElement | null>(null);
   const [loading, setLoading] = useState(false);
   // Seed from the library store: if we already have books in memory (the
@@ -265,6 +267,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   // immediately. This prevents `showBookshelf` from briefly being false on
   // remount, which used to flash a placeholder before `initLibrary` finished.
   const [libraryLoaded, setLibraryLoaded] = useState(() => libraryBooks.length > 0);
+  const refreshGoogleDriveLibrary = useGoogleDriveLibrary(libraryLoaded);
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [isSelectAll, setIsSelectAll] = useState(false);
   const [isSelectNone, setIsSelectNone] = useState(false);
@@ -318,7 +321,6 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
 
   const iconSize = useResponsiveSize(18);
   const viewSettings = settings.globalViewSettings;
-  const demoBooks = useDemoBooks();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const handleScrollerRef = useCallback((el: HTMLDivElement | null) => {
     scrollRef.current = el;
@@ -437,10 +439,6 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     const snapshot = searchParams?.toString() || '';
     if (snapshot !== new URLSearchParams(window.location.search).toString()) return;
     sessionStorage.setItem('lastLibraryParams', snapshot);
-  }, [searchParams]);
-
-  useEffect(() => {
-    if (searchParams?.get('drive')) setShowGoogleDriveSource(true);
   }, [searchParams]);
 
   // Strip the empty `group=` param that `handleLibraryNavigation` sets as a
@@ -901,23 +899,6 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     }
   }, [libraryBooks, searchParams, settings.libraryGroupBy]);
 
-  useEffect(() => {
-    if (demoBooks.length > 0 && libraryLoaded) {
-      const newLibrary = [...libraryBooks];
-      for (const book of demoBooks) {
-        const idx = newLibrary.findIndex((b) => b.hash === book.hash);
-        if (idx === -1) {
-          newLibrary.push(book);
-        } else {
-          newLibrary[idx] = book;
-        }
-      }
-      setLibrary(newLibrary);
-      appService?.saveLibraryBooks(newLibrary);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [demoBooks, libraryLoaded]);
-
   const importBooks = (
     files: SelectedFile[],
     groupId?: string,
@@ -1163,6 +1144,30 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
     setBooksTransferProgress,
   );
 
+  const handleLibraryBookDownload = async (
+    book: Book,
+    options?: { redownload?: boolean; queued?: boolean; silent?: boolean },
+  ): Promise<boolean> => {
+    if (!needsGoogleDriveDownload(book)) return handleBookDownload(book, options);
+    try {
+      const selected = await downloadGoogleDriveLibraryBook(book);
+      await importBooks(
+        [{ file: selected.file, cloudSource: selected.cloudSource }],
+        getImportTargetGroupId(),
+      );
+      await refreshGoogleDriveLibrary();
+      return true;
+    } catch (error) {
+      if (!options?.silent) {
+        eventDispatcher.dispatch('toast', {
+          message: error instanceof Error ? error.message : _('Failed to download book'),
+          type: 'error',
+        });
+      }
+      return false;
+    }
+  };
+
   const handleBookDelete = (deleteAction: DeleteAction) => {
     return async (book: Book, syncBooks = true) => {
       const deletionMessages = {
@@ -1330,11 +1335,6 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       if (result.files.length === 0 || result.error) return;
       importBooks(result.files, getImportTargetGroupId());
     });
-  };
-
-  const handleImportGoogleDriveFiles = async (files: SelectedFile[]) => {
-    setIsSelectMode(false);
-    await importBooks(files, getImportTargetGroupId());
   };
 
   useAndroidPickedBooks(appService, (files) => {
@@ -1949,9 +1949,6 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           onImportBookFromNovelUrl={
             isTauriAppPlatform() ? () => setShowImportNovel(true) : undefined
           }
-          onOpenGoogleDriveSource={
-            isWebAppPlatform() ? () => setShowGoogleDriveSource(true) : undefined
-          }
           onOpenCatalogManager={handleShowOPDSDialog}
           onOpenFeeds={handleShowFeeds}
           onToggleSelectMode={() => handleSetSelectMode(!isSelectMode)}
@@ -2083,7 +2080,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
                 onScrollerRef={handleScrollerRef}
                 handleImportBooks={setImportMenuAnchor}
                 handleBookUpload={handleBookUpload}
-                handleBookDownload={handleBookDownload}
+                handleBookDownload={handleLibraryBookDownload}
                 handleBookDelete={handleBookDelete('both')}
                 handleBookPurge={handleBookDelete('purge')}
                 handleSetSelectMode={handleSetSelectMode}
@@ -2119,9 +2116,6 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           onImportBookFromNovelUrl={
             isTauriAppPlatform() ? () => setShowImportNovel(true) : undefined
           }
-          onOpenGoogleDriveSource={
-            isWebAppPlatform() ? () => setShowGoogleDriveSource(true) : undefined
-          }
           onOpenCatalogManager={handleShowOPDSDialog}
           onOpenFeeds={handleShowFeeds}
         />
@@ -2133,7 +2127,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           book={showDetailsBook}
           onClose={() => setShowDetailsBook(null)}
           handleBookUpload={handleBookUpload}
-          handleBookDownload={handleBookDownload}
+          handleBookDownload={handleLibraryBookDownload}
           handleBookDelete={handleBookDelete('both')}
           // Readest storage only. A third-party provider mirrors the library, so
           // removing just its cloud copy is not expressible: the next sync would
@@ -2162,11 +2156,6 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       {isSettingsDialogOpen && <SettingsDialog bookKey={''} />}
       {showCatalogManager && <CatalogDialog onClose={handleDismissOPDSDialog} />}
       {showFeeds && <FeedsView onClose={() => setShowFeeds(false)} />}
-      <GoogleDriveSourceDialog
-        isOpen={showGoogleDriveSource}
-        onClose={() => setShowGoogleDriveSource(false)}
-        onImport={handleImportGoogleDriveFiles}
-      />
       <AddFeedModal
         isOpen={showAddFeed}
         onClose={() => setShowAddFeed(false)}

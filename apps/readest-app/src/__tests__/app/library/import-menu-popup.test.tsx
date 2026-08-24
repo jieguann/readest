@@ -63,14 +63,10 @@ describe('ImportMenuPopup', () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
-  it('opens the Google Drive cloud catalog when it is available', () => {
-    const onOpenGoogleDriveSource = vi.fn();
-    const { onClose } = renderPopup({ onOpenGoogleDriveSource });
+  it('does not show a Google Drive catalog window action', () => {
+    renderPopup();
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Google Drive Books' }));
-
-    expect(onOpenGoogleDriveSource).toHaveBeenCalledTimes(1);
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('menuitem', { name: 'Google Drive Books' })).toBeNull();
   });
 
   it('uses the OPDS label when curated online catalogs are unavailable', () => {

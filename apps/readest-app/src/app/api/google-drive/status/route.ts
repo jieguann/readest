@@ -1,4 +1,7 @@
-import { DEFAULT_GOOGLE_DRIVE_FOLDER_URL } from '@/services/googleDriveSource';
+import {
+  DEFAULT_GOOGLE_DRIVE_FOLDER_URL,
+  parseGoogleDriveFolderId,
+} from '@/services/googleDriveSource';
 import { DRIVE_SESSION_COOKIE, readCookie } from '@/server/googleDrive/cookies';
 import { getDriveSession, getGoogleDriveCredentials } from '@/server/googleDrive/store';
 
@@ -9,14 +12,18 @@ export async function GET(request: Request): Promise<Response> {
     getGoogleDriveCredentials();
     const sessionId = readCookie(request, DRIVE_SESSION_COOKIE);
     const session = sessionId ? await getDriveSession(sessionId) : null;
+    const fixedFolderId = parseGoogleDriveFolderId(DEFAULT_GOOGLE_DRIVE_FOLDER_URL);
     return Response.json(
       session
         ? {
             connected: true,
             configured: true,
             email: session.google_email,
-            folderUrl: session.folder_url ?? DEFAULT_GOOGLE_DRIVE_FOLDER_URL,
-            folderName: session.folder_name ?? 'Readest Books',
+            folderUrl: DEFAULT_GOOGLE_DRIVE_FOLDER_URL,
+            folderName:
+              session.folder_id === fixedFolderId
+                ? (session.folder_name ?? 'Readest Books')
+                : 'Readest Books',
           }
         : { connected: false, configured: true, folderUrl: DEFAULT_GOOGLE_DRIVE_FOLDER_URL },
       { headers: { 'Cache-Control': 'no-store' } },
