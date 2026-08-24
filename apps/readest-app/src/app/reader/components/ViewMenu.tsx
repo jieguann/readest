@@ -40,6 +40,7 @@ import dayjs from 'dayjs';
 import { clampSyncTimeForDisplay } from '@/utils/time';
 import { saveViewSettings } from '@/helpers/settings';
 import { tauriHandleToggleFullScreen } from '@/utils/window';
+import { isWebAppPlatform } from '@/services/environment';
 import MenuItem from '@/components/MenuItem';
 import Menu from '@/components/Menu';
 
@@ -488,35 +489,38 @@ const ViewMenu: React.FC<ViewMenuProps> = ({
         disabled={bookData.isFixedLayout}
       />
 
-      <hr aria-hidden='true' className='border-base-300 my-1' />
-
-      <MenuItem
-        label={
-          !user
-            ? _('Sign in to Sync')
-            : lastSyncTime
-              ? _('Synced {{time}}', {
-                  time: dayjs(clampSyncTimeForDisplay(lastSyncTime)).fromNow(),
-                })
-              : _('Never synced')
-        }
-        Icon={user ? MdSync : MdSyncProblem}
-        iconClassName={user && viewState?.syncing ? 'animate-reverse-spin' : ''}
-        onClick={handleSync}
-        siblings={
-          <button
-            aria-label={_('Sync Info')}
-            title={_('Sync Info')}
-            className='hover:bg-base-300 text-base-content/70 mx-1 rounded-md px-2'
-            onClick={() => {
-              setIsDropdownOpen?.(false);
-              onShowMetaHashDialog?.();
-            }}
-          >
-            <MdInfoOutline size={16} />
-          </button>
-        }
-      />
+      {!isWebAppPlatform() && (
+        <>
+          <hr aria-hidden='true' className='border-base-300 my-1' />
+          <MenuItem
+            label={
+              !user
+                ? _('Sign in to Sync')
+                : lastSyncTime
+                  ? _('Synced {{time}}', {
+                      time: dayjs(clampSyncTimeForDisplay(lastSyncTime)).fromNow(),
+                    })
+                  : _('Never synced')
+            }
+            Icon={user ? MdSync : MdSyncProblem}
+            iconClassName={user && viewState?.syncing ? 'animate-reverse-spin' : ''}
+            onClick={handleSync}
+            siblings={
+              <button
+                aria-label={_('Sync Info')}
+                title={_('Sync Info')}
+                className='hover:bg-base-300 text-base-content/70 mx-1 rounded-md px-2'
+                onClick={() => {
+                  setIsDropdownOpen?.(false);
+                  onShowMetaHashDialog?.();
+                }}
+              >
+                <MdInfoOutline size={16} />
+              </button>
+            }
+          />
+        </>
+      )}
 
       <hr aria-hidden='true' className='border-base-300 my-1' />
 
@@ -557,9 +561,12 @@ const ViewMenu: React.FC<ViewMenuProps> = ({
         onClick={() => setInvertImgColorInDark(!invertImgColorInDark)}
       />
 
-      <hr aria-hidden='true' className='border-base-300 my-1' />
-
-      <MenuItem label={_('Share Book')} Icon={IoShareOutline} onClick={handleShare} />
+      {!isWebAppPlatform() && (
+        <>
+          <hr aria-hidden='true' className='border-base-300 my-1' />
+          <MenuItem label={_('Share Book')} Icon={IoShareOutline} onClick={handleShare} />
+        </>
+      )}
     </Menu>
   );
 };

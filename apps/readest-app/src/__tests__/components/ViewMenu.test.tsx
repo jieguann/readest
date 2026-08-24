@@ -90,6 +90,9 @@ vi.mock('@/services/constants', () => ({
   MIN_CONTRAST: 50,
   CONTRAST_STEP: 10,
 }));
+vi.mock('@/services/environment', () => ({
+  isWebAppPlatform: () => process.env['NEXT_PUBLIC_APP_PLATFORM'] === 'web',
+}));
 vi.mock('@/utils/style', () => ({ getStyles: vi.fn() }));
 vi.mock('@/utils/nav', () => ({ navigateToLogin: vi.fn() }));
 vi.mock('@/utils/webtoon', () => ({ getScrollGapAttr: vi.fn() }));
@@ -112,6 +115,16 @@ describe('ViewMenu right-to-left pages toggle', () => {
 
   afterEach(() => {
     cleanup();
+    vi.unstubAllEnvs();
+  });
+
+  it('hides account sync and sharing actions in the hosted web reader', () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_PLATFORM', 'web');
+
+    render(<ViewMenu bookKey='book-1' />);
+
+    expect(screen.queryByText('Sign in to Sync')).toBeNull();
+    expect(screen.queryByText('Share Book')).toBeNull();
   });
 
   it('shows the toggle for fixed-layout books', () => {
