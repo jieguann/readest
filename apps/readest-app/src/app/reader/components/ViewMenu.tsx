@@ -40,9 +40,13 @@ import dayjs from 'dayjs';
 import { clampSyncTimeForDisplay } from '@/utils/time';
 import { saveViewSettings } from '@/helpers/settings';
 import { tauriHandleToggleFullScreen } from '@/utils/window';
-import { isWebAppPlatform } from '@/services/environment';
 import MenuItem from '@/components/MenuItem';
 import Menu from '@/components/Menu';
+
+// Keep the hosted-reader menu decision build-time only. Importing the full
+// environment service here creates a startup cycle through WebAppService and
+// can leave book initialization waiting forever before content loading starts.
+const isHostedWebReader = () => process.env['NEXT_PUBLIC_APP_PLATFORM'] === 'web';
 
 interface ViewMenuProps {
   bookKey: string;
@@ -489,7 +493,7 @@ const ViewMenu: React.FC<ViewMenuProps> = ({
         disabled={bookData.isFixedLayout}
       />
 
-      {!isWebAppPlatform() && (
+      {!isHostedWebReader() && (
         <>
           <hr aria-hidden='true' className='border-base-300 my-1' />
           <MenuItem
@@ -561,7 +565,7 @@ const ViewMenu: React.FC<ViewMenuProps> = ({
         onClick={() => setInvertImgColorInDark(!invertImgColorInDark)}
       />
 
-      {!isWebAppPlatform() && (
+      {!isHostedWebReader() && (
         <>
           <hr aria-hidden='true' className='border-base-300 my-1' />
           <MenuItem label={_('Share Book')} Icon={IoShareOutline} onClick={handleShare} />

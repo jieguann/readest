@@ -55,14 +55,24 @@ const getNativeAppService = async () => {
 };
 
 let webAppService: AppService | null = null;
+let webAppServicePromise: Promise<AppService> | null = null;
 const getWebAppService = async () => {
-  if (!webAppService) {
-    const { WebAppService } = await import('@/services/webAppService');
-    const service = new WebAppService();
-    await service.init();
-    webAppService = service;
+  if (webAppService) return webAppService;
+  if (!webAppServicePromise) {
+    webAppServicePromise = (async () => {
+      const { WebAppService } = await import('@/services/webAppService');
+      const service = new WebAppService();
+      await service.init();
+      webAppService = service;
+      return service;
+    })().catch((error) => {
+      // A failed attempt must not poison every later request for the lifetime
+      // of the tab. The next caller may retry from a clean service instance.
+      webAppServicePromise = null;
+      throw error;
+    });
   }
-  return webAppService;
+  return webAppServicePromise;
 };
 
 const environmentConfig: EnvConfigType = {

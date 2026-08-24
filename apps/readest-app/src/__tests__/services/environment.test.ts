@@ -263,5 +263,31 @@ describe('environment', () => {
       const envConfig = await import('@/services/environment');
       expect(typeof envConfig.default.getAppService).toBe('function');
     });
+
+    test('shares one web service initialization across concurrent callers', async () => {
+      env['NEXT_PUBLIC_APP_PLATFORM'] = 'web';
+      let finishInit!: () => void;
+      const init = vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finishInit = resolve;
+          }),
+      );
+      vi.doMock('@/services/webAppService', () => ({
+        WebAppService: class {
+          init = init;
+        },
+      }));
+
+      const { default: envConfig } = await import('@/services/environment');
+      const first = envConfig.getAppService();
+      const second = envConfig.getAppService();
+
+      await vi.waitFor(() => expect(init).toHaveBeenCalledTimes(1));
+      finishInit();
+      const [firstService, secondService] = await Promise.all([first, second]);
+
+      expect(firstService).toBe(secondService);
+    });
   });
 });
