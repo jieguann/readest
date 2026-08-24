@@ -5,6 +5,7 @@
     "ignoreUnknown": true,
     "includes": [
       "**",
+      "!apps/readest-publish-*/**",
       "!**/node_modules/**",
       "!**/packages/**",
       "!**/.claude/**",
