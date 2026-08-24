@@ -95,7 +95,12 @@ const BookDetailModal: React.FC<BookDetailModalProps> = ({
   const deleteConfigs: Record<DeleteMenuAction, DeleteConfig> = {
     both: {
       title: _('Confirm Deletion'),
-      message: _('Are you sure to delete the selected book?'),
+      message:
+        book.cloudSource?.provider === 'google-drive'
+          ? _(
+              'This removes the book from this library and moves the original file to Google Drive trash.',
+            )
+          : _('Are you sure to delete the selected book?'),
       handler: handleBookDelete,
       showPurgeToggle: !!handleBookPurge,
     },

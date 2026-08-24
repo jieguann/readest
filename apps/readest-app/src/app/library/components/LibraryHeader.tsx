@@ -1,7 +1,7 @@
 import clsx from 'clsx';
 import React, { useRef } from 'react';
 import { FaChevronDown, FaSearch } from 'react-icons/fa';
-import { MdManageSearch } from 'react-icons/md';
+import { MdManageSearch, MdOutlineCloudUpload } from 'react-icons/md';
 import { PiPlus } from 'react-icons/pi';
 import { PiSelectionAll, PiSelectionAllFill } from 'react-icons/pi';
 import { PiDotsThreeCircle } from 'react-icons/pi';
@@ -33,6 +33,7 @@ interface LibraryHeaderProps {
   onImportBookFromNovelUrl?: () => void;
   onOpenCatalogManager: () => void;
   onOpenFeeds: () => void;
+  onConnectGoogleDrive?: () => void;
   onToggleSelectMode: () => void;
   onSelectAll: () => void;
   onDeselectAll: () => void;
@@ -54,6 +55,7 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
   onImportBookFromNovelUrl,
   onOpenCatalogManager,
   onOpenFeeds,
+  onConnectGoogleDrive,
   onToggleSelectMode,
   onSelectAll,
   onDeselectAll,
@@ -197,23 +199,35 @@ const LibraryHeader: React.FC<LibraryHeaderProps> = ({
             {searchTarget !== 'text' && (
               <>
                 <span className='bg-base-content/50 mx-2 h-4 w-[0.5px]'></span>
-                <Dropdown
-                  label={_('Import Books')}
-                  className={clsx(
-                    'exclude-title-bar-mousedown dropdown-bottom dropdown-center cursor-pointer',
-                  )}
-                  buttonClassName='p-0 h-6 min-h-6 w-6 flex touch-target items-center justify-center !bg-transparent'
-                  toggleButton={<PiPlus role='none' className='m-0.5 h-5 w-5' />}
-                >
-                  <ImportMenu
-                    onImportBooksFromFiles={onImportBooksFromFiles}
-                    onImportBooksFromDirectory={onImportBooksFromDirectory}
-                    onImportBookFromUrl={onImportBookFromUrl}
-                    onImportBookFromNovelUrl={onImportBookFromNovelUrl}
-                    onOpenCatalogManager={onOpenCatalogManager}
-                    onOpenFeeds={onOpenFeeds}
-                  />
-                </Dropdown>
+                {onConnectGoogleDrive ? (
+                  <button
+                    type='button'
+                    aria-label={_('Add books to Google Drive')}
+                    title={_('Add books to Google Drive')}
+                    className='exclude-title-bar-mousedown flex h-6 min-h-6 w-6 touch-target items-center justify-center'
+                    onClick={onConnectGoogleDrive}
+                  >
+                    <MdOutlineCloudUpload role='none' className='h-5 w-5' />
+                  </button>
+                ) : (
+                  <Dropdown
+                    label={_('Import Books')}
+                    className={clsx(
+                      'exclude-title-bar-mousedown dropdown-bottom dropdown-center cursor-pointer',
+                    )}
+                    buttonClassName='p-0 h-6 min-h-6 w-6 flex touch-target items-center justify-center !bg-transparent'
+                    toggleButton={<PiPlus role='none' className='m-0.5 h-5 w-5' />}
+                  >
+                    <ImportMenu
+                      onImportBooksFromFiles={onImportBooksFromFiles}
+                      onImportBooksFromDirectory={onImportBooksFromDirectory}
+                      onImportBookFromUrl={onImportBookFromUrl}
+                      onImportBookFromNovelUrl={onImportBookFromNovelUrl}
+                      onOpenCatalogManager={onOpenCatalogManager}
+                      onOpenFeeds={onOpenFeeds}
+                    />
+                  </Dropdown>
+                )}
                 {isMobile ? null : (
                   <button
                     onClick={onToggleSelectMode}

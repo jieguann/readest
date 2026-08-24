@@ -9,6 +9,7 @@ import { useBookProgress } from '@/store/readerProgressStore';
 import { useSidebarStore } from '@/store/sidebarStore';
 import { useBookDataStore } from '@/store/bookDataStore';
 import { useTranslation } from '@/hooks/useTranslation';
+import { isWebAppPlatform } from '@/services/environment';
 import { getGridTemplate, getInsetEdges } from '@/utils/grid';
 import { tauriSetWindowTitle } from '@/utils/window';
 import { useContentInsets } from '../hooks/useContentInsets';
@@ -27,6 +28,8 @@ import HintInfo from './HintInfo';
 import ReadingRuler from './ReadingRuler';
 import DoubleBorder from './DoubleBorder';
 import ReadingStatsTracker from './ReadingStatsTracker';
+import { getPersistentFooterInset } from './footerbar/position';
+import { isForcedMobileLayout } from '../utils/mobileLayout';
 
 interface BooksGridProps {
   bookKeys: string[];
@@ -94,6 +97,7 @@ const BookCellInner: React.FC<BookCellProps> = ({
   // "destructure-subscribes-the-whole-store" rationale.
   const getConfig = useBookDataStore((s) => s.getConfig);
   const getBookData = useBookDataStore((s) => s.getBookData);
+  const { appService } = useEnv();
 
   // Per-cell reactive subscriptions. This cell re-renders when THIS book's
   // progress changes (page turns) OR its view state changes. Both are
@@ -122,7 +126,14 @@ const BookCellInner: React.FC<BookCellProps> = ({
   // viewInsets/contentInsets stay stable while the user is just turning pages
   // (margins are unchanged) but update when a margin setting changes — even
   // though saveViewSettings mutates viewSettings in place (#4898).
-  const { viewInsets, contentInsets } = useContentInsets(viewSettings, gridInsets);
+  const useMobileFooterLayout =
+    window.innerWidth < 640 || isForcedMobileLayout(appService?.isMobile);
+  const persistentFooterInset = getPersistentFooterInset(isWebAppPlatform(), useMobileFooterLayout);
+  const { viewInsets, contentInsets } = useContentInsets(
+    viewSettings,
+    gridInsets,
+    persistentFooterInset,
+  );
 
   // The page content (viewer + its header/footer chrome) that the pull-down
   // bookmark gesture slides as one block.

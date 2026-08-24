@@ -1,5 +1,8 @@
 import { createPkceChallenge, randomToken } from '@/server/googleDrive/crypto';
-import { DEFAULT_GOOGLE_DRIVE_FOLDER_URL } from '@/services/googleDriveSource';
+import {
+  DEFAULT_GOOGLE_DRIVE_FOLDER_URL,
+  GOOGLE_DRIVE_MANAGE_SCOPE,
+} from '@/services/googleDriveSource';
 import {
   DRIVE_OAUTH_STATE_COOKIE,
   DRIVE_OAUTH_VERIFIER_COOKIE,
@@ -23,10 +26,7 @@ export async function GET(request: Request): Promise<Response> {
     authorizationUrl.searchParams.set('client_id', clientId);
     authorizationUrl.searchParams.set('redirect_uri', redirectUri);
     authorizationUrl.searchParams.set('response_type', 'code');
-    authorizationUrl.searchParams.set(
-      'scope',
-      'openid email https://www.googleapis.com/auth/drive.readonly',
-    );
+    authorizationUrl.searchParams.set('scope', `openid email ${GOOGLE_DRIVE_MANAGE_SCOPE}`);
     authorizationUrl.searchParams.set('access_type', 'offline');
     authorizationUrl.searchParams.set('prompt', 'consent');
     authorizationUrl.searchParams.set('include_granted_scopes', 'true');

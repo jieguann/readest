@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { getFooterBarPosition } from '@/app/reader/components/footerbar/position';
+import {
+  getFooterBarPosition,
+  getPersistentFooterInset,
+  isFooterBarVisible,
+} from '@/app/reader/components/footerbar/position';
 
 describe('getFooterBarPosition', () => {
   it('pins the mobile footer layout to the viewport when no sidebar is pinned', () => {
@@ -16,5 +20,17 @@ describe('getFooterBarPosition', () => {
   it('keeps the desktop footer anchored in the grid cell regardless of pinning', () => {
     expect(getFooterBarPosition(false, false)).toBe('absolute');
     expect(getFooterBarPosition(false, true)).toBe('absolute');
+  });
+
+  it('keeps the web reader footer visible without hover', () => {
+    expect(isFooterBarVisible(true, '', 'book-1')).toBe(true);
+    expect(isFooterBarVisible(false, '', 'book-1')).toBe(false);
+    expect(isFooterBarVisible(false, 'book-1', 'book-1')).toBe(true);
+  });
+
+  it('reserves the toolbar height only when it is persistent', () => {
+    expect(getPersistentFooterInset(true, false)).toBe(52);
+    expect(getPersistentFooterInset(true, true)).toBe(64);
+    expect(getPersistentFooterInset(false, false)).toBe(0);
   });
 });

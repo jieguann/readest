@@ -20,9 +20,9 @@ import { DEFAULT_SYSTEM_SETTINGS } from '@/services/constants';
 
 vi.mock('next/image', () => ({
   __esModule: true,
-  default: (props: Record<string, unknown>) => {
+  default: ({ unoptimized, ...props }: Record<string, unknown>) => {
     // biome-ignore lint/a11y/useAltText: test mock; alt comes from spread props
-    return <img {...props} />;
+    return <img data-unoptimized={String(unoptimized === true)} {...props} />;
   },
 }));
 
@@ -65,6 +65,21 @@ describe('BookCover', () => {
     const img = container.querySelector('img.cover-image');
     expect(img).toBeTruthy();
     expect(img?.getAttribute('loading')).toBe('lazy');
+  });
+
+  it('loads private Google Drive covers directly with the signed-in browser session', () => {
+    const { container } = render(
+      <BookCover
+        book={makeBook({
+          coverImageUrl: 'https://reader.example/api/google-drive/books/file-1/cover',
+        })}
+        coverFit='crop'
+      />,
+    );
+
+    expect(container.querySelector('img.cover-image')?.getAttribute('data-unoptimized')).toBe(
+      'true',
+    );
   });
 
   it('reports natural aspect ratio via onAspectRatioChange when fit-mode image loads', () => {

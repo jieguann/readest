@@ -9,6 +9,8 @@ import { getContentMd5 } from '@/utils/misc';
 export const DEFAULT_GOOGLE_DRIVE_FOLDER_URL =
   'https://drive.google.com/drive/folders/1uq-I5OWJTI_FkCw34r8ugxssdls16sqH?usp=drive_link';
 
+export const GOOGLE_DRIVE_MANAGE_SCOPE = 'https://www.googleapis.com/auth/drive';
+
 export const GOOGLE_DRIVE_FOLDER_MIME = 'application/vnd.google-apps.folder';
 
 export interface GoogleDriveCloudSource {
@@ -16,6 +18,7 @@ export interface GoogleDriveCloudSource {
   fileId: string;
   folderId: string;
   name: string;
+  relativePath?: string;
   modifiedTime?: string;
 }
 
@@ -26,6 +29,7 @@ export interface GoogleDriveBookFile {
   size: number | null;
   modifiedTime: string | null;
   relativePath: string;
+  hasThumbnail?: boolean;
   progress?: GoogleDriveProgress;
 }
 
@@ -42,6 +46,7 @@ export interface GoogleDriveProgress {
 export interface GoogleDriveStatus {
   connected: boolean;
   configured: boolean;
+  canManage?: boolean;
   email?: string;
   folderUrl?: string;
   folderName?: string;
@@ -84,6 +89,36 @@ export const isGoogleDriveCatalogBook = (book: Book): boolean =>
   !!book.url &&
   book.url.includes('/api/google-drive/books/');
 
+const getCachedDrivePathKey = (book: Book): string | null => {
+  if (!isGoogleDriveCatalogBook(book) || book.cloudSource?.provider !== 'google-drive') return null;
+  const sourcePath = book.cloudSource.relativePath || book.cloudSource.name;
+  return `${book.cloudSource.folderId}:${sourcePath.toLocaleLowerCase()}`;
+};
+
+const getDriveModifiedAt = (book: Book): number => {
+  const modifiedAt = Date.parse(book.cloudSource?.modifiedTime ?? '');
+  return Number.isFinite(modifiedAt) ? modifiedAt : book.updatedAt;
+};
+
+export const prepareCachedGoogleDriveLibrary = (library: Book[]): Book[] => {
+  const preferredCatalogBooks = new Map<string, Book>();
+  for (const book of library) {
+    if (isDemoBook(book)) continue;
+    const key = getCachedDrivePathKey(book);
+    if (!key) continue;
+    const preferred = preferredCatalogBooks.get(key);
+    if (!preferred || getDriveModifiedAt(book) >= getDriveModifiedAt(preferred)) {
+      preferredCatalogBooks.set(key, book);
+    }
+  }
+
+  return library.filter((book) => {
+    if (isDemoBook(book)) return false;
+    const key = getCachedDrivePathKey(book);
+    return !key || preferredCatalogBooks.get(key) === book;
+  });
+};
+
 export const needsGoogleDriveDownload = (book: Book): boolean =>
   book.cloudSource?.provider === 'google-drive' && !book.downloadedAt;
 
@@ -105,11 +140,15 @@ const toCatalogBook = (file: GoogleDriveBookFile, folderId: string, origin: stri
     readingStatus: progress?.readingStatus ?? 'unread',
     readingStatusUpdatedAt: progress?.updatedAt,
     url: new URL(`/api/google-drive/books/${encodeURIComponent(file.id)}`, origin).toString(),
+    coverImageUrl: file.hasThumbnail
+      ? new URL(`/api/google-drive/books/${encodeURIComponent(file.id)}/cover`, origin).toString()
+      : undefined,
     cloudSource: {
       provider: 'google-drive',
       fileId: file.id,
       folderId,
       name: file.name,
+      relativePath: file.relativePath,
       modifiedTime: file.modifiedTime ?? undefined,
     },
   };
@@ -144,7 +183,7 @@ export const buildDriveChildrenUrl = (folderId: string, pageToken?: string): str
   );
   url.searchParams.set(
     'fields',
-    'nextPageToken,files(id,name,mimeType,size,modifiedTime,parents,capabilities(canDownload))',
+    'nextPageToken,files(id,name,mimeType,size,modifiedTime,parents,hasThumbnail,capabilities(canDownload))',
   );
   url.searchParams.set('pageSize', '1000');
   url.searchParams.set('orderBy', 'folder,name_natural');
@@ -229,6 +268,7 @@ export const downloadGoogleDriveBook = async (
       fileId: book.id,
       folderId,
       name: book.name,
+      relativePath: book.relativePath,
       modifiedTime: book.modifiedTime ?? undefined,
     },
   };
@@ -246,9 +286,36 @@ export const downloadGoogleDriveLibraryBook = async (book: Book) => {
       mimeType: 'application/octet-stream',
       size: null,
       modifiedTime: source.modifiedTime ?? null,
-      relativePath: source.name,
+      relativePath: source.relativePath ?? source.name,
     },
     source.folderId,
+  );
+};
+
+export const uploadGoogleDriveBook = async (file: File): Promise<GoogleDriveBookFile> => {
+  const { book } = await readJson<{ book: GoogleDriveBookFile }>(
+    await fetch('/api/google-drive/books', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': file.type || 'application/octet-stream',
+        'X-Readest-File-Name': encodeURIComponent(file.name),
+        'X-Readest-File-Size': String(file.size),
+      },
+      body: file,
+    }),
+  );
+  return book;
+};
+
+export const deleteGoogleDriveBook = async (book: Book): Promise<void> => {
+  const source = book.cloudSource;
+  if (source?.provider !== 'google-drive') {
+    throw new Error('This book is not stored in Google Drive');
+  }
+  await readJson(
+    await fetch(`/api/google-drive/books/${encodeURIComponent(source.fileId)}`, {
+      method: 'DELETE',
+    }),
   );
 };
 

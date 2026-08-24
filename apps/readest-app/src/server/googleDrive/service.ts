@@ -36,7 +36,10 @@ interface DriveFileResponse {
   size?: string;
   modifiedTime?: string;
   parents?: string[];
+  hasThumbnail?: boolean;
+  thumbnailLink?: string;
   capabilities?: { canDownload?: boolean };
+  trashed?: boolean;
 }
 
 interface DriveListResponse {
@@ -50,6 +53,15 @@ const driveFetch = async <T>(url: string, accessToken: string): Promise<T> => {
   const body = (await response.json()) as T & { error?: { message?: string } };
   if (!response.ok) throw new Error(body.error?.message || 'Google Drive request failed');
   return body;
+};
+
+const driveErrorMessage = async (response: Response): Promise<string> => {
+  try {
+    const body = (await response.json()) as { error?: { message?: string } };
+    return body.error?.message || 'Google Drive request failed';
+  } catch {
+    return 'Google Drive request failed';
+  }
 };
 
 const refreshAccessToken = async (
@@ -162,6 +174,7 @@ export const listDriveBooks = async (
             size: file.size ? Number(file.size) : null,
             modifiedTime: file.modifiedTime ?? null,
             relativePath,
+            hasThumbnail: file.hasThumbnail === true,
           });
         }
       }
@@ -176,7 +189,7 @@ const getFileMetadata = async (fileId: string, accessToken: string): Promise<Dri
   const url = new URL(`${GOOGLE_DRIVE_FILES_ENDPOINT}/${encodeURIComponent(fileId)}`);
   url.searchParams.set(
     'fields',
-    'id,name,mimeType,size,modifiedTime,parents,trashed,capabilities(canDownload)',
+    'id,name,mimeType,size,modifiedTime,parents,trashed,hasThumbnail,thumbnailLink,capabilities(canDownload)',
   );
   url.searchParams.set('supportsAllDrives', 'true');
   return driveFetch<DriveFileResponse>(url.toString(), accessToken);
@@ -207,6 +220,103 @@ export const assertFileInFolder = async (
 
 export const driveMediaUrl = (fileId: string): string =>
   `${GOOGLE_DRIVE_FILES_ENDPOINT}/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`;
+
+const escapeDriveQueryLiteral = (value: string): string =>
+  value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+const findRootBookByName = async (
+  folderId: string,
+  name: string,
+  accessToken: string,
+): Promise<DriveFileResponse | null> => {
+  const url = new URL(GOOGLE_DRIVE_FILES_ENDPOINT);
+  url.searchParams.set(
+    'q',
+    `'${escapeDriveQueryLiteral(folderId)}' in parents and name = '${escapeDriveQueryLiteral(name)}' and trashed = false`,
+  );
+  url.searchParams.set('fields', 'files(id,name,mimeType,size,modifiedTime,parents,hasThumbnail)');
+  url.searchParams.set('pageSize', '2');
+  url.searchParams.set('supportsAllDrives', 'true');
+  url.searchParams.set('includeItemsFromAllDrives', 'true');
+  const result = await driveFetch<DriveListResponse>(url.toString(), accessToken);
+  return (
+    result.files?.find(
+      (file) => file.mimeType !== GOOGLE_DRIVE_FOLDER_MIME && isSupportedDriveBook(file.name),
+    ) ?? null
+  );
+};
+
+const toDriveBookFile = (file: DriveFileResponse): GoogleDriveBookFile => ({
+  id: file.id,
+  name: file.name,
+  mimeType: file.mimeType || 'application/octet-stream',
+  size: file.size ? Number(file.size) : null,
+  modifiedTime: file.modifiedTime ?? null,
+  relativePath: file.name,
+  hasThumbnail: file.hasThumbnail === true,
+});
+
+export const uploadDriveBook = async (
+  folderId: string,
+  name: string,
+  mimeType: string,
+  data: ArrayBuffer,
+  accessToken: string,
+): Promise<GoogleDriveBookFile> => {
+  if (!isSupportedDriveBook(name)) throw new Error('This file cannot be opened as a book');
+  const existing = await findRootBookByName(folderId, name, accessToken);
+  const uploadUrl = new URL(
+    existing
+      ? `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(existing.id)}`
+      : 'https://www.googleapis.com/upload/drive/v3/files',
+  );
+  uploadUrl.searchParams.set('uploadType', 'resumable');
+  uploadUrl.searchParams.set('supportsAllDrives', 'true');
+  uploadUrl.searchParams.set('fields', 'id,name,mimeType,size,modifiedTime,parents,hasThumbnail');
+  const initiation = await fetch(uploadUrl.toString(), {
+    method: existing ? 'PATCH' : 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json; charset=UTF-8',
+      'X-Upload-Content-Type': mimeType,
+      'X-Upload-Content-Length': String(data.byteLength),
+    },
+    body: JSON.stringify(existing ? { name } : { name, parents: [folderId] }),
+  });
+  if (!initiation.ok) throw new Error(await driveErrorMessage(initiation));
+  const sessionUrl = initiation.headers.get('Location');
+  if (!sessionUrl) throw new Error('Google Drive did not start the upload');
+
+  const uploaded = await fetch(sessionUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': mimeType,
+      'Content-Length': String(data.byteLength),
+    },
+    body: data,
+  });
+  if (!uploaded.ok) throw new Error(await driveErrorMessage(uploaded));
+  return toDriveBookFile((await uploaded.json()) as DriveFileResponse);
+};
+
+export const trashDriveBook = async (
+  fileId: string,
+  folderId: string,
+  accessToken: string,
+): Promise<void> => {
+  await assertFileInFolder(fileId, folderId, accessToken);
+  const url = new URL(`${GOOGLE_DRIVE_FILES_ENDPOINT}/${encodeURIComponent(fileId)}`);
+  url.searchParams.set('supportsAllDrives', 'true');
+  const response = await fetch(url.toString(), {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ trashed: true }),
+  });
+  if (!response.ok) throw new Error(await driveErrorMessage(response));
+};
 
 export const getConfiguredFolder = (
   session: DriveSessionRecord,

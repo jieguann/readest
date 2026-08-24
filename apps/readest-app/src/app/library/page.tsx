@@ -131,8 +131,12 @@ import SettingsDialog from '@/components/settings/SettingsDialog';
 import ModalPortal from '@/components/ModalPortal';
 import TransferQueuePanel from './components/TransferQueuePanel';
 import {
+  buildGoogleDriveConnectUrl,
+  deleteGoogleDriveBook,
   downloadGoogleDriveLibraryBook,
+  getGoogleDriveStatus,
   needsGoogleDriveDownload,
+  uploadGoogleDriveBook,
 } from '@/services/googleDriveSource';
 
 /** Skip tiny non-book artifacts during folder auto-scan (matches the manual import dialog default). */
@@ -1184,6 +1188,11 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       };
 
       try {
+        const isDriveBook = book.cloudSource?.provider === 'google-drive';
+        if (isDriveBook && (deleteAction === 'both' || deleteAction === 'purge')) {
+          await deleteGoogleDriveBook(book);
+        }
+
         // Handle local deletion immediately. Purge mirrors 'both' (tombstone +
         // queued cloud delete) but hands 'purge' to deleteBook, which also wipes
         // the entire Books/<hash>/ folder (config/nav/cover) — issue #4615.
@@ -1235,9 +1244,12 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           message: deletionMessages[deleteAction],
         });
         return true;
-      } catch {
+      } catch (error) {
         eventDispatcher.dispatch('toast', {
-          message: deletionFailMessages[deleteAction],
+          message:
+            book.cloudSource?.provider === 'google-drive' && error instanceof Error
+              ? error.message
+              : deletionFailMessages[deleteAction],
           type: 'error',
         });
         return false;
@@ -1920,6 +1932,51 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
   }
 
   const showBookshelf = libraryLoaded || libraryBooks.length > 0;
+  const isFixedDriveWebReader = isWebAppPlatform();
+  const handleConnectGoogleDrive = () => {
+    window.location.assign(buildGoogleDriveConnectUrl());
+  };
+  const handleGoogleDriveUpload = async () => {
+    try {
+      const status = await getGoogleDriveStatus();
+      if (!status.connected || !status.canManage) {
+        handleConnectGoogleDrive();
+        return;
+      }
+      const result = await selectFiles({ type: 'books', multiple: true });
+      if (result.error) throw new Error(result.error);
+      const files = result.files
+        .map((selected) => selected.file)
+        .filter((file): file is File => !!file);
+      if (files.length === 0) return;
+
+      setLoading(true);
+      const failures: string[] = [];
+      for (const file of files) {
+        try {
+          await uploadGoogleDriveBook(file);
+        } catch (error) {
+          failures.push(error instanceof Error ? error.message : file.name);
+        }
+      }
+      await refreshGoogleDriveLibrary();
+      const uploadedCount = files.length - failures.length;
+      if (uploadedCount > 0) {
+        eventDispatcher.dispatch('toast', {
+          type: 'info',
+          message: _('Uploaded {{count}} book(s) to Google Drive', { count: uploadedCount }),
+        });
+      }
+      if (failures.length > 0) throw new Error(failures[0]);
+    } catch (error) {
+      eventDispatcher.dispatch('toast', {
+        type: 'error',
+        message: error instanceof Error ? error.message : _('Failed to upload book'),
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div
@@ -1951,6 +2008,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
           }
           onOpenCatalogManager={handleShowOPDSDialog}
           onOpenFeeds={handleShowFeeds}
+          onConnectGoogleDrive={isFixedDriveWebReader ? handleGoogleDriveUpload : undefined}
           onToggleSelectMode={() => handleSetSelectMode(!isSelectMode)}
           onSelectAll={handleSelectAll}
           onDeselectAll={handleDeselectAll}
@@ -2079,6 +2137,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
                 isSelectNone={isSelectNone}
                 onScrollerRef={handleScrollerRef}
                 handleImportBooks={setImportMenuAnchor}
+                showImportControl={!isFixedDriveWebReader}
                 handleBookUpload={handleBookUpload}
                 handleBookDownload={handleLibraryBookDownload}
                 handleBookDelete={handleBookDelete('both')}
@@ -2101,10 +2160,13 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
         ) : (
           <div className='hero drop-zone h-screen items-center justify-center'>
             <DropIndicator />
-            <LibraryEmptyState onImport={setImportMenuAnchor} />
+            <LibraryEmptyState
+              onImport={setImportMenuAnchor}
+              onConnectGoogleDrive={isFixedDriveWebReader ? handleConnectGoogleDrive : undefined}
+            />
           </div>
         ))}
-      {importMenuAnchor && (
+      {importMenuAnchor && !isFixedDriveWebReader && (
         <ImportMenuPopup
           anchor={importMenuAnchor}
           onClose={() => setImportMenuAnchor(null)}

@@ -1,9 +1,14 @@
-import type { GoogleDriveProgress } from '@/services/googleDriveSource';
+import {
+  GOOGLE_DRIVE_MANAGE_SCOPE,
+  isSupportedDriveBook,
+  type GoogleDriveProgress,
+} from '@/services/googleDriveSource';
 import {
   getConfiguredFolder,
   getDriveAccess,
   listDriveBooks,
   resolveFolderLink,
+  uploadDriveBook,
 } from '@/server/googleDrive/service';
 import { listDriveProgress, updateDriveFolder } from '@/server/googleDrive/store';
 
@@ -67,6 +72,47 @@ export async function POST(request: Request): Promise<Response> {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Could not use that Drive folder';
+    const status = message.includes('Connect Google Drive') ? 401 : 400;
+    return Response.json({ error: message }, { status });
+  }
+}
+
+export async function PUT(request: Request): Promise<Response> {
+  try {
+    const { session, accessToken } = await getDriveAccess(request);
+    if (!session.granted_scope.split(/\s+/).includes(GOOGLE_DRIVE_MANAGE_SCOPE)) {
+      return Response.json(
+        { error: 'Reconnect Google Drive to allow uploads and deletions', reconnect: true },
+        { status: 403 },
+      );
+    }
+    const encodedName = request.headers.get('X-Readest-File-Name');
+    if (!encodedName) throw new Error('Choose a book file to upload');
+    let name: string;
+    try {
+      name = decodeURIComponent(encodedName);
+    } catch {
+      throw new Error('That book filename is invalid');
+    }
+    if (!name || name.includes('/') || name.includes('\\') || !isSupportedDriveBook(name)) {
+      throw new Error('This file cannot be opened as a book');
+    }
+    const data = await request.arrayBuffer();
+    const expectedSize = Number(request.headers.get('X-Readest-File-Size'));
+    if (Number.isFinite(expectedSize) && expectedSize !== data.byteLength) {
+      throw new Error('The selected book was not uploaded completely');
+    }
+    const folder = getConfiguredFolder(session);
+    const book = await uploadDriveBook(
+      folder.id,
+      name,
+      request.headers.get('Content-Type') || 'application/octet-stream',
+      data,
+      accessToken,
+    );
+    return Response.json({ book }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not upload this book';
     const status = message.includes('Connect Google Drive') ? 401 : 400;
     return Response.json({ error: message }, { status });
   }

@@ -12,3 +12,14 @@ export const getFooterBarPosition = (
   useMobileFooterLayout: boolean,
   isSideBarPinned: boolean,
 ): FooterBarPosition => (useMobileFooterLayout && !isSideBarPinned ? 'fixed' : 'absolute');
+
+export const isFooterBarVisible = (
+  persistent: boolean,
+  hoveredBookKey: string | null,
+  bookKey: string,
+): boolean => persistent || hoveredBookKey === bookKey;
+
+export const getPersistentFooterInset = (
+  persistent: boolean,
+  useMobileFooterLayout: boolean,
+): number => (persistent ? (useMobileFooterLayout ? 64 : 52) : 0);

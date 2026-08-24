@@ -3,7 +3,9 @@ import {
   driveMediaUrl,
   getConfiguredFolder,
   getDriveAccess,
+  trashDriveBook,
 } from '@/server/googleDrive/service';
+import { GOOGLE_DRIVE_MANAGE_SCOPE } from '@/services/googleDriveSource';
 
 export const runtime = 'edge';
 
@@ -32,6 +34,29 @@ export async function GET(
     return new Response(upstream.body, { status: 200, headers });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Could not download this book';
+    const status = message.includes('Connect Google Drive') ? 401 : 400;
+    return Response.json({ error: message }, { status });
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  context: { params: Promise<{ fileId: string }> },
+): Promise<Response> {
+  try {
+    const { fileId } = await context.params;
+    const { session, accessToken } = await getDriveAccess(request);
+    if (!session.granted_scope.split(/\s+/).includes(GOOGLE_DRIVE_MANAGE_SCOPE)) {
+      return Response.json(
+        { error: 'Reconnect Google Drive to allow uploads and deletions', reconnect: true },
+        { status: 403 },
+      );
+    }
+    const folder = getConfiguredFolder(session);
+    await trashDriveBook(fileId, folder.id, accessToken);
+    return Response.json({ deleted: true }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Could not delete this book';
     const status = message.includes('Connect Google Drive') ? 401 : 400;
     return Response.json({ error: message }, { status });
   }

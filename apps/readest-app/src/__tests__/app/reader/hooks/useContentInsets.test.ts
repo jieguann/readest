@@ -75,6 +75,13 @@ describe('useContentInsets', () => {
     expect(result.current.contentInsets.left).toBe(22);
   });
 
+  it('reserves space below the text for a persistent reader toolbar', () => {
+    const viewSettings = makeViewSettings();
+    const { result } = renderHook(() => useContentInsets(viewSettings, ZERO, 52));
+
+    expect(result.current.contentInsets.bottom).toBe(96);
+  });
+
   it('keeps a stable contentInsets reference across a page turn (unchanged margins)', () => {
     const viewSettings = makeViewSettings();
     const { result, rerender } = renderHook(({ vs, gi }) => useContentInsets(vs, gi), {

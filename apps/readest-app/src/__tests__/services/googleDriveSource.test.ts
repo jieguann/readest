@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Book, BookConfig } from '@/types/book';
 import {
   buildGoogleDriveConnectUrl,
@@ -6,9 +6,12 @@ import {
   DEFAULT_GOOGLE_DRIVE_FOLDER_URL,
   isGoogleDriveCatalogBook,
   isSupportedDriveBook,
+  deleteGoogleDriveBook,
   mergeGoogleDriveCatalog,
   mergeRemoteDriveProgress,
   parseGoogleDriveFolderId,
+  prepareCachedGoogleDriveLibrary,
+  uploadGoogleDriveBook,
   type GoogleDriveBookFile,
 } from '@/services/googleDriveSource';
 
@@ -37,6 +40,10 @@ const makeDriveFile = (
 });
 
 describe('Google Drive book source', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('extracts the configured folder id from a shared folder link', () => {
     expect(
       parseGoogleDriveFolderId(
@@ -88,6 +95,7 @@ describe('Google Drive book source', () => {
         makeDriveFile('file-1', 'downloaded.epub'),
         makeDriveFile('file-3', 'Cloud Book.pdf', {
           mimeType: 'application/pdf',
+          hasThumbnail: true,
           progress: {
             fileId: 'file-3',
             current: 25,
@@ -114,6 +122,7 @@ describe('Google Drive book source', () => {
       progress: [25, 100],
       readingStatus: 'reading',
       url: 'https://reader.example/api/google-drive/books/file-3',
+      coverImageUrl: 'https://reader.example/api/google-drive/books/file-3/cover',
     });
   });
 
@@ -142,6 +151,31 @@ describe('Google Drive book source', () => {
     expect(DEFAULT_GOOGLE_DRIVE_FOLDER_URL).toContain('/1uq-I5OWJTI_FkCw34r8ugxssdls16sqH');
   });
 
+  it('hides stale cached copies of the same Drive path before the first refresh', () => {
+    const cachedDriveBook = (hash: string, fileId: string, modifiedTime: string): Book =>
+      makeBook({
+        hash,
+        title: 'Same book',
+        url: `https://reader.example/api/google-drive/books/${fileId}`,
+        cloudSource: {
+          provider: 'google-drive',
+          fileId,
+          folderId: 'folder',
+          name: 'Same book.epub',
+          relativePath: 'Shelf/Same book.epub',
+          modifiedTime,
+        },
+      });
+
+    const result = prepareCachedGoogleDriveLibrary([
+      cachedDriveBook('old', 'old-file', '2026-08-20T00:00:00.000Z'),
+      makeBook({ hash: 'personal' }),
+      cachedDriveBook('current', 'current-file', '2026-08-23T00:00:00.000Z'),
+    ]);
+
+    expect(result.map((book) => book.hash)).toEqual(['personal', 'current']);
+  });
+
   it('lists only formats Readest can open', () => {
     expect(isSupportedDriveBook('book.epub')).toBe(true);
     expect(isSupportedDriveBook('book.PDF')).toBe(true);
@@ -154,6 +188,7 @@ describe('Google Drive book source', () => {
     expect(url.searchParams.get('q')).toBe("'folder\\'id' in parents and trashed = false");
     expect(url.searchParams.get('supportsAllDrives')).toBe('true');
     expect(url.searchParams.get('includeItemsFromAllDrives')).toBe('true');
+    expect(url.searchParams.get('fields')).toContain('hasThumbnail');
   });
 
   it('applies newer cloud progress while preserving local notes and settings', () => {
@@ -202,5 +237,57 @@ describe('Google Drive book source', () => {
         updatedAt: 20,
       }),
     ).toBe(local);
+  });
+
+  it('uploads a selected book into the configured Drive folder', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          book: makeDriveFile('uploaded-file', 'Uploaded.epub'),
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const file = new File(['book'], 'Uploaded.epub', { type: 'application/epub+zip' });
+
+    await expect(uploadGoogleDriveBook(file)).resolves.toMatchObject({
+      id: 'uploaded-file',
+      name: 'Uploaded.epub',
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/google-drive/books',
+      expect.objectContaining({
+        method: 'PUT',
+        body: file,
+        headers: expect.objectContaining({
+          'X-Readest-File-Name': encodeURIComponent(file.name),
+          'X-Readest-File-Size': String(file.size),
+        }),
+      }),
+    );
+  });
+
+  it('deletes a Drive-backed book through its Drive file id', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ deleted: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const book = makeBook({
+      cloudSource: {
+        provider: 'google-drive',
+        fileId: 'drive-file',
+        folderId: 'folder',
+        name: 'Book.epub',
+      },
+    });
+
+    await expect(deleteGoogleDriveBook(book)).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith('/api/google-drive/books/drive-file', {
+      method: 'DELETE',
+    });
   });
 });

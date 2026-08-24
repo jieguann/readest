@@ -76,13 +76,18 @@ describe('LibraryEmptyState', () => {
     expect(screen.queryByRole('button', { name: 'Sign in to sync your library' })).toBeNull();
   });
 
-  it('hides the Readest account sign-in prompt in the web-only reader', () => {
+  it('shows only the direct Google Drive connection in the web-only reader', () => {
     isWebAppPlatformMock.mockReturnValue(true);
     useEnvMock.mockReturnValue({ appService: { isMobile: false } });
     useAuthMock.mockReturnValue({ user: null });
-    render(<LibraryEmptyState onImport={vi.fn()} />);
+    const handleConnectGoogleDrive = vi.fn();
+    render(
+      <LibraryEmptyState onImport={vi.fn()} onConnectGoogleDrive={handleConnectGoogleDrive} />,
+    );
 
-    expect(screen.getByRole('button', { name: 'Import Books' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Import Books' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Connect Google Drive' }));
+    expect(handleConnectGoogleDrive).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: 'Sign in to sync your library' })).toBeNull();
   });
 

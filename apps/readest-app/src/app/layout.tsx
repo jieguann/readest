@@ -4,6 +4,7 @@ import Script from 'next/script';
 import { ViewTransitions } from 'next-view-transitions';
 import { EnvProvider } from '@/context/EnvContext';
 import Providers from '@/components/Providers';
+import PWAServiceWorkerRegistration from '@/components/PWAServiceWorkerRegistration';
 
 import '../styles/globals.css';
 
@@ -24,7 +25,6 @@ export const metadata: Metadata = {
   },
   description,
   generator: 'Next.js',
-  manifest: '/manifest.json',
   keywords: ['epub', 'pdf', 'ebook', 'reader', 'readest', 'pwa'],
   authors: [
     {
@@ -139,6 +139,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={process.env['NEXT_PUBLIC_APP_PLATFORM'] === 'tauri' ? 'edge-to-edge' : ''}
     >
       <head>
+        <link rel='manifest' href='/manifest.json' crossOrigin='use-credentials' />
         {shouldInjectRuntimeConfig ? (
           <Script src='/runtime-config.js' strategy='beforeInteractive' />
         ) : null}
@@ -147,6 +148,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         ) : null}
       </head>
       <body>
+        <PWAServiceWorkerRegistration />
         <ViewTransitions>
           <EnvProvider>
             <Providers>{children}</Providers>

@@ -85,6 +85,7 @@ interface BookshelfProps {
   isSelectNone: boolean;
   onScrollerRef: (el: HTMLDivElement | null) => void;
   handleImportBooks: (anchor: HTMLElement) => void;
+  showImportControl?: boolean;
   handleBookDownload: (
     book: Book,
     options?: { redownload?: boolean; queued?: boolean; silent?: boolean },
@@ -191,6 +192,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
   isSelectNone,
   onScrollerRef,
   handleImportBooks,
+  showImportControl = true,
   handleBookUpload,
   handleBookDownload,
   handleBookDelete,
@@ -811,10 +813,9 @@ const Bookshelf: React.FC<BookshelfProps> = ({
 
   const isGridMode = viewMode === 'grid';
   const hasItems = sortedBookshelfItems.length > 0;
-  // In grid mode the Import-Books "+" tile is rendered as an extra grid cell
-  // after all books. We represent it to Virtuoso as an extra index past the
-  // last book; list mode doesn't have an import tile.
-  const gridTotalCount = hasItems ? sortedBookshelfItems.length + 1 : 0;
+  // In grid mode native apps render an Import-Books "+" tile after all books.
+  // The fixed-folder web reader deliberately has no generic import controls.
+  const gridTotalCount = hasItems ? sortedBookshelfItems.length + (showImportControl ? 1 : 0) : 0;
 
   // Recently-read shelf: shares the availability-aware open path with per-item
   // taps so cloud-only synced books download before opening. `openBook` is
@@ -919,7 +920,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
 
   const renderBookshelfItem = useCallback(
     (index: number) => {
-      if (isGridMode && index === sortedBookshelfItems.length) {
+      if (showImportControl && isGridMode && index === sortedBookshelfItems.length) {
         return (
           <div
             className={clsx('bookshelf-import-item mx-0 my-2 sm:mx-4 sm:my-4')}
@@ -976,6 +977,7 @@ const Bookshelf: React.FC<BookshelfProps> = ({
     [
       sortedBookshelfItems,
       selectedBooks,
+      showImportControl,
       isGridMode,
       viewMode,
       coverFit,
@@ -997,14 +999,14 @@ const Bookshelf: React.FC<BookshelfProps> = ({
 
   const computeItemKey = useCallback(
     (index: number) => {
-      if (isGridMode && index === sortedBookshelfItems.length) {
+      if (showImportControl && isGridMode && index === sortedBookshelfItems.length) {
         return 'library-import-tile';
       }
       const item = sortedBookshelfItems[index];
       if (!item) return `library-item-${index}`;
       return `library-item-${'hash' in item ? item.hash : item.id}`;
     },
-    [sortedBookshelfItems, isGridMode],
+    [sortedBookshelfItems, isGridMode, showImportControl],
   );
 
   return (
@@ -1131,9 +1133,20 @@ const Bookshelf: React.FC<BookshelfProps> = ({
         >
           <DeleteConfirmAlert
             title={_('Confirm Deletion')}
-            message={_('Are you sure to delete {{count}} selected book(s)?', {
-              count: getBooksToDelete().length,
-            })}
+            message={(() => {
+              const books = getBooksToDelete();
+              const driveCount = books.filter(
+                (book) => book.cloudSource?.provider === 'google-drive',
+              ).length;
+              return driveCount > 0
+                ? _(
+                    'Delete {{count}} selected book(s)? {{driveCount}} Google Drive file(s) will be moved to trash.',
+                    { count: books.length, driveCount },
+                  )
+                : _('Are you sure to delete {{count}} selected book(s)?', {
+                    count: books.length,
+                  });
+            })()}
             showPurgeToggle
             onCancel={() => {
               abortDeletionRef.current = true;

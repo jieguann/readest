@@ -47,6 +47,9 @@ const BookCover: React.FC<BookCoverProps> = memo<BookCoverProps>(
     const coverImageUrl = metadataCoverImageUrl || usableThumbnail || book.coverImageUrl || null;
     const hideCovers = useSettingsStore((state) => state.settings.libraryHideCovers);
     const displayCoverUrl = hideCovers ? null : coverImageUrl;
+    const loadCoverDirectly =
+      displayCoverUrl?.includes('/api/google-drive/books/') === true &&
+      displayCoverUrl.endsWith('/cover');
 
     const shouldShowSpine = showSpine && !hideCovers && imageLoaded && !imageError;
 
@@ -118,6 +121,7 @@ const BookCover: React.FC<BookCoverProps> = memo<BookCoverProps>(
                 src={displayCoverUrl}
                 alt={book.title}
                 fill={true}
+                unoptimized={loadCoverDirectly}
                 loading='lazy'
                 draggable={false}
                 className={clsx(
@@ -147,6 +151,7 @@ const BookCover: React.FC<BookCoverProps> = memo<BookCoverProps>(
                   alt={book.title}
                   width={0}
                   height={0}
+                  unoptimized={loadCoverDirectly}
                   sizes='100vw'
                   loading='lazy'
                   draggable={false}

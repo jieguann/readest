@@ -1,5 +1,6 @@
 import {
   DEFAULT_GOOGLE_DRIVE_FOLDER_URL,
+  GOOGLE_DRIVE_MANAGE_SCOPE,
   parseGoogleDriveFolderId,
 } from '@/services/googleDriveSource';
 import { DRIVE_SESSION_COOKIE, readCookie } from '@/server/googleDrive/cookies';
@@ -18,6 +19,7 @@ export async function GET(request: Request): Promise<Response> {
         ? {
             connected: true,
             configured: true,
+            canManage: session.granted_scope.split(/\s+/).includes(GOOGLE_DRIVE_MANAGE_SCOPE),
             email: session.google_email,
             folderUrl: DEFAULT_GOOGLE_DRIVE_FOLDER_URL,
             folderName:
@@ -25,7 +27,12 @@ export async function GET(request: Request): Promise<Response> {
                 ? (session.folder_name ?? 'Readest Books')
                 : 'Readest Books',
           }
-        : { connected: false, configured: true, folderUrl: DEFAULT_GOOGLE_DRIVE_FOLDER_URL },
+        : {
+            connected: false,
+            configured: true,
+            canManage: false,
+            folderUrl: DEFAULT_GOOGLE_DRIVE_FOLDER_URL,
+          },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {

@@ -19,7 +19,11 @@ const ZERO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
  * the same object reference (children bail out of re-rendering), while a
  * changed margin yields a new reference that propagates to the paginator.
  */
-export const useContentInsets = (viewSettings: ViewSettings | null, gridInsets: Insets) => {
+export const useContentInsets = (
+  viewSettings: ViewSettings | null,
+  gridInsets: Insets,
+  persistentFooterInset = 0,
+) => {
   const resolved = viewSettings ? getViewInsets(viewSettings) : ZERO_INSETS;
   const viewInsets = useMemo(
     () => resolved,
@@ -30,7 +34,7 @@ export const useContentInsets = (viewSettings: ViewSettings | null, gridInsets: 
     () => ({
       top: gridInsets.top + viewInsets.top,
       right: gridInsets.right + viewInsets.right,
-      bottom: gridInsets.bottom + viewInsets.bottom,
+      bottom: gridInsets.bottom + viewInsets.bottom + persistentFooterInset,
       left: gridInsets.left + viewInsets.left,
     }),
     [
@@ -42,6 +46,7 @@ export const useContentInsets = (viewSettings: ViewSettings | null, gridInsets: 
       viewInsets.right,
       viewInsets.bottom,
       viewInsets.left,
+      persistentFooterInset,
     ],
   );
   return { viewInsets, contentInsets };

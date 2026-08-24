@@ -1,26 +1,25 @@
 {
   "name": "Readest",
   "short_name": "Readest",
-  "start_url": "/",
+  "id": "/library",
+  "start_url": "/library",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
+  "theme_color": "#ffffff",
   "description": "Readest is an open-source eBook reader supporting EPUB, PDF, and sync across devices.",
   "icons": [
     {
-      "src": "/icon.png",
+      "src": "/icon-192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
-      "src": "/icon.png",
+      "src": "/icon-512.png",
       "type": "image/png",
-      "sizes": "256x256"
-    },
-    {
-      "src": "/icon.png",
-      "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
-  ],
-  "splash_pages": null
+  ]
 }

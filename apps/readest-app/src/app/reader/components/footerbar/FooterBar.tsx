@@ -11,11 +11,12 @@ import { useDeviceControlStore } from '@/store/deviceStore';
 import { eventDispatcher } from '@/utils/event';
 import type { FooterBarProps, NavigationHandlers, FooterBarChildProps } from './types';
 import { debounce } from '@/utils/debounce';
+import { isWebAppPlatform } from '@/services/environment';
 import { isForcedMobileLayout } from '../../utils/mobileLayout';
 import { RSVPControl } from '../rsvp';
 import MobileFooterBar from './MobileFooterBar';
 import DesktopFooterBar from './DesktopFooterBar';
-import { getFooterBarPosition } from './position';
+import { getFooterBarPosition, isFooterBarVisible } from './position';
 import TTSControl from '../tts/TTSControl';
 
 const FooterBar: React.FC<FooterBarProps> = ({
@@ -42,7 +43,7 @@ const FooterBar: React.FC<FooterBarProps> = ({
   const viewSettings = getViewSettings(bookKey);
 
   const actionTab = hoveredBookKey === bookKey ? bottomBarTab : '';
-  const isVisible = hoveredBookKey === bookKey;
+  const isVisible = isFooterBarVisible(isWebAppPlatform(), hoveredBookKey, bookKey);
 
   const docs = view?.renderer.getContents() ?? [];
   const pointerInDoc = docs.some(({ doc }) => doc?.body?.style.cursor === 'pointer');
